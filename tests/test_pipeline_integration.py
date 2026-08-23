@@ -267,7 +267,7 @@ def test_price_tag_only_group_makes_no_card_but_is_reported(wired, monkeypatch):
     assert all("가격표만" in p.review_reason for p in result.needs_review)
 
     report = (tmp_path / "out" / "2026-08-23" / "_data" / "리포트.md").read_text(encoding="utf-8")
-    assert "사람이 확인해야 하는 건" in report and "가격표만" in report
+    assert "카드뉴스를 만들지 못한 것" in report and "가격표만" in report
 
 
 def test_web_research_line_is_used_on_the_card(wired):

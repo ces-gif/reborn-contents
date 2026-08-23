@@ -487,8 +487,21 @@ def _report(result: RunResult, settings: Settings) -> str:
         )
         if p.condition_note:
             lines.append(f"   · 상태 표기: {p.condition_note}")
+        if p.cautions:
+            lines.append(f"   · ⚠️ 확인 권장: {p.cautions}")
+
+    cautioned = [p for p in result.published if p.cautions]
+    if cautioned:
+        lines += [
+            "",
+            "## 확인 권장 (카드뉴스는 만들었습니다)",
+            "가격은 가격표에서 읽은 그대로입니다. 상품명 표기만 한 번 봐주세요.",
+        ]
+        for p in cautioned:
+            lines.append(f"- [{p.source_name}] {p.product_name} — {p.cautions}")
+
     if result.needs_review:
-        lines += ["", "## 사람이 확인해야 하는 건 (카드뉴스 미생성)"]
+        lines += ["", "## 카드뉴스를 만들지 못한 것"]
         for p in result.needs_review:
             lines.append(
                 f"- [{p.source_name}] {p.product_name or '(상품명 불명)'} — "

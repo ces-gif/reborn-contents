@@ -55,6 +55,30 @@ CLAIM_PATTERNS = [
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?。])\s+|\n+")
 
+# 카드가 **틀리게** 나가는 사유만 발행을 막는다.
+# "가격표 글자가 조금 흐릿하다" 같은 건 카드를 만들고 리포트에만 적는다 —
+# 이름이 조금 덜 정확한 카드가, 카드가 아예 없는 것보다 낫다.
+MISMATCH_PATTERNS = [
+    re.compile(pattern)
+    for pattern in (
+        r"서로 다릅니다",
+        r"서로 다른",
+        r"일치하지 않",
+        r"불일치",
+        r"다른 상품",
+        r"상품이 바뀌",
+    )
+]
+
+
+def _blocks_publishing(reason: str) -> bool:
+    """이 사유 때문에 카드를 만들면 안 되는가.
+
+    상품과 가격표가 서로 다른 물건이면 **틀린 가격**이 카드에 찍힌다. 그건 막는다.
+    글자가 흐리다거나 모델명이 애매하다는 건 막지 않는다.
+    """
+    return any(pattern.search(reason) for pattern in MISMATCH_PATTERNS)
+
 
 class PhotoRead(BaseModel):
     index: int = Field(description="사진 번호 (1부터)")
@@ -193,7 +217,8 @@ class Product:
     best_photo_index: int = 0
     photo_kinds: list[str] = field(default_factory=list)
     needs_review: bool = False
-    review_reason: str = ""
+    review_reason: str = ""      # 발행을 막는 사유
+    cautions: str = ""           # 카드는 만들되 사람이 한 번 볼 만한 것
 
     # 웹 검색으로 채워지는 부분 (research.py)
     spec_line: str = ""
@@ -261,11 +286,16 @@ class Product:
 
     @property
     def publishable(self) -> bool:
-        """카드뉴스로 만들 수 있는 상태인가."""
+        """카드뉴스로 만들 수 있는 상태인가.
+
+        needs_review 는 이제 **발행을 막는 사유**만 담는다. 글자가 흐리다는
+        정도의 지적(cautions)은 카드를 만들고 리포트에만 적는다.
+        """
         return bool(self.has_product_photo and self.sale_price and not self.needs_review)
 
     def to_dict(self) -> dict:
         data = asdict(self)
+        data["cautions"] = self.cautions
         data["computed_pct"] = self.computed_pct
         data["publishable"] = self.publishable
         data["has_product_photo"] = self.has_product_photo
@@ -351,9 +381,14 @@ def extract_product(
 
     # 1차 판독에서 "가격표"로 본 사진은 카드 배경으로 쓰지 않는다.
     # 사진 한 장만 놓고 본 1차 판독이 더 보수적이라, 가격표가 카드에 실리는 사고를 막아준다.
+    # 다만 **그렇게 해서 상품 사진이 하나도 안 남는다면 적용하지 않는다** —
+    # 1차 판독이 틀렸을 때 멀쩡한 상품을 통째로 못 만들게 되기 때문이다.
+    forced = list(kinds)
     for i, known in enumerate(known_kinds or []):
-        if i < len(kinds) and known == "price_tag":
-            kinds[i] = "price_tag"
+        if i < len(forced) and known == "price_tag":
+            forced[i] = "price_tag"
+    if any(k in ("product", "both") for k in forced):
+        kinds = forced
 
     product = Product(
         product_name=read.product_name,
@@ -403,8 +438,17 @@ def strip_unevidenced_claims(text: str, tag_text: str) -> str:
 
 
 def sanity_check(p: Product) -> Product:
-    """모델이 실수했을 때 잘못된 값이 조용히 카드에 찍히는 것을 막는다."""
-    reasons: list[str] = [p.review_reason] if p.review_reason else []
+    """모델이 실수했을 때 잘못된 값이 조용히 카드에 찍히는 것을 막는다.
+
+    막는 것과 알려주기만 하는 것을 나눈다.
+      · 막는다  — 카드가 틀리게 나가는 경우 (가격을 못 읽음, 상품 사진 없음,
+                  상품과 가격표가 서로 다른 물건, 할인율이 말이 안 됨)
+      · 알린다  — 이름 표기가 조금 애매한 정도. 카드는 만들고 리포트에 적는다.
+    """
+    reasons: list[str] = []
+    cautions: list[str] = []
+    if p.review_reason:
+        (reasons if _blocks_publishing(p.review_reason) else cautions).append(p.review_reason)
 
     if p.sale_price is not None and p.sale_price <= 0:
         p.sale_price = None
@@ -442,6 +486,7 @@ def sanity_check(p: Product) -> Product:
 
     p.needs_review = bool(reasons)
     p.review_reason = "; ".join(dict.fromkeys(r for r in reasons if r))
+    p.cautions = "; ".join(dict.fromkeys(c for c in cautions if c))
     return p
 
 
