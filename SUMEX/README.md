@@ -213,6 +213,38 @@ node tools/node/test/render.test.mjs         # 대시보드 렌더링
 
 ---
 
+## 독립 저장소로 분리
+
+지금은 리본마켓 저장소(`ces-gif/reborn-contents`) 안의 한 폴더로 들어가 있다.
+리본마켓은 중고가전 유통, SUMEX 는 의료기기 영업이라 성격이 완전히 다르므로
+저장소를 나누는 것이 맞다.
+
+```bash
+# 1) GitHub 에서 빈 저장소를 만든다 — 이름 sumex-auto, Private, 초기화 파일 없이
+#    https://github.com/new
+
+# 2) 무엇이 옮겨지는지 먼저 본다
+python3 scripts/split_repo.py --dry-run
+
+# 3) 만들면서 바로 푸시
+python3 scripts/split_repo.py --out /tmp/sumex-auto \
+    --push https://github.com/ces-gif/sumex-auto.git
+```
+
+스크립트가 하는 일
+
+- `SUMEX/` 내용을 새 저장소 **최상위**로 올리고 `.claude/skills/sumex-*` 6개를 함께 가져간다
+- CI 워크플로를 독립 저장소 기준으로 다시 쓴다 (`working-directory: SUMEX` 제거)
+- 문서 안의 `cd SUMEX`, `SUMEX/knowledge/` 같은 경로 안내를 자동으로 고친다
+- `data/private/` 실제 파일, `templates/*.xlsx`, `out/` 은 **가져가지 않는다**
+
+**비공개로 만들 것.** 교육자료는 사내 교육용 대외비이고 거래처 이름이 들어 있다.
+공개 저장소로 두면 개인정보를 분리해도 거래처 목록 자체가 노출된다.
+
+새 환경에서는 `python3 scripts/bootstrap_private_data.py` 로 개인정보 레이어를 다시 만든다.
+
+---
+
 ## Hugging Face — 기계가 읽는 사본
 
 깃허브는 사람이 읽고 고치는 곳이고, Hugging Face 는 기계가 읽는 곳으로 쓴다.

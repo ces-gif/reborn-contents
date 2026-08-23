@@ -20,17 +20,17 @@
 
 사용법
     # 1) 먼저 GitHub 에서 빈 저장소를 하나 만든다 (비공개 권장)
-    #    https://github.com/new  →  이름: sumex-sales, Private, 초기화 파일 없이
+    #    https://github.com/new  →  이름: sumex-auto, Private, 초기화 파일 없이
 
     # 2) 미리보기 — 어디에 뭐가 놓이는지만 확인
     python3 scripts/split_repo.py --dry-run
 
     # 3) 로컬에 만들어 본다
-    python3 scripts/split_repo.py --out /tmp/sumex-sales
+    python3 scripts/split_repo.py --out /tmp/sumex-auto
 
     # 4) 만들면서 바로 푸시
-    python3 scripts/split_repo.py --out /tmp/sumex-sales \\
-        --push https://github.com/ces-gif/sumex-sales.git
+    python3 scripts/split_repo.py --out /tmp/sumex-auto \\
+        --push https://github.com/ces-gif/sumex-auto.git
 
 비공개로 만들 것
     교육자료는 사내 교육용 대외비이고 거래처 이름이 들어 있다.
@@ -39,7 +39,6 @@
 from __future__ import annotations
 
 import argparse
-import re
 import shutil
 import subprocess
 import sys
@@ -51,6 +50,10 @@ REPO = SUMEX.parent                                # .../reborn-contents
 EXCLUDE_DIRS = {"out", "__pycache__", ".venv", "node_modules", ".pytest_cache", ".git"}
 EXCLUDE_SUFFIX = {".pyc", ".xlsx", ".xls"}          # templates 실양식 포함
 KEEP_PRIVATE = {"README.md"}                        # data/private 에서 이것만 가져간다
+EXCLUDE_FILES = {"scripts/split_repo.py"}           # 분리 스크립트 자신은 안 가져간다
+
+# 새 저장소에서는 의미가 없어지는 문단 (제목 줄부터 다음 `---` 앞까지 통째로 뺀다)
+DROP_SECTIONS = ["## 독립 저장소로 분리"]
 
 WORKFLOW = """name: CI
 
@@ -148,6 +151,19 @@ REWRITES: list[tuple[str, str]] = [
      "`.claude/skills/` 에 6개가 들어 있다."),
     ("`.claude/skills/    저장소 루트에 sumex-* 6개",
      "`.claude/skills/    sumex-* 6개"),
+    # 새 저장소는 비공개로 만드는 것을 전제로 한다. 그래도 개인정보 분리는 유지한다 —
+    # 비공개 저장소도 협업자에게 열리고, 허깅페이스 발행이 같은 파일을 읽는다.
+    ("이 저장소는 **공개**다. 인수인계 자료에는 교수·간호사·구매 담당자의 실명과\n"
+     "휴대폰·이메일이 들어 있어서, 그대로 올리면 안 된다.",
+     "저장소를 비공개로 두더라도 개인정보는 분리해 둔다. 비공개 저장소도 협업자에게\n"
+     "열리고, 허깅페이스 발행이 같은 파일을 읽기 때문이다."),
+    ("이 저장소는 **공개**다. 인수인계 자료에는 교수·간호사·구매 담당자의 실명과\n"
+     "휴대폰·이메일이 있다.",
+     "저장소가 비공개여도 개인정보는 분리해 둔다. 인수인계 자료에는 교수·간호사·구매\n"
+     "담당자의 실명과 휴대폰·이메일이 있다."),
+    # 분리 안내는 새 저장소에서 의미가 없다 (이미 분리된 상태)
+    ("리본마켓 저장소(`ces-gif/reborn-contents`) 안의 한 폴더로 들어가 있다",
+     "리본마켓 저장소에서 분리되어 나온 독립 저장소다"),
     # 남은 것은 모두 폴더 접두사이므로 일괄로 자른다
     ("SUMEX/knowledge/", "knowledge/"),
     ("SUMEX/data/", "data/"),
@@ -162,6 +178,8 @@ REWRITES: list[tuple[str, str]] = [
 
 def wanted(path: Path) -> bool:
     rel = path.relative_to(SUMEX)
+    if rel.as_posix() in EXCLUDE_FILES:
+        return False
     if any(part in EXCLUDE_DIRS for part in rel.parts):
         return False
     if path.suffix in EXCLUDE_SUFFIX:
@@ -177,7 +195,19 @@ def collect() -> list[Path]:
     return sorted(p for p in SUMEX.rglob("*") if p.is_file() and wanted(p))
 
 
+def drop_sections(text: str) -> str:
+    """제목 줄부터 다음 구분선(---) 직전까지 통째로 들어낸다."""
+    for heading in DROP_SECTIONS:
+        start = text.find(f"\n{heading}\n")
+        if start == -1:
+            continue
+        end = text.find("\n---\n", start + 1)
+        text = text[:start] + (text[end:] if end != -1 else "\n")
+    return text
+
+
 def rewrite(text: str) -> str:
+    text = drop_sections(text)
     for old, new in REWRITES:
         text = text.replace(old, new)
     return text
@@ -271,7 +301,7 @@ def commit_and_push(out: Path, remote: str | None) -> None:
 
 def main() -> int:
     p = argparse.ArgumentParser(description="SUMEX 를 독립 저장소로 분리")
-    p.add_argument("--out", default="/tmp/sumex-sales", help="만들 위치")
+    p.add_argument("--out", default="/tmp/sumex-auto", help="만들 위치")
     p.add_argument("--push", metavar="URL", help="만들면서 이 원격으로 푸시한다")
     p.add_argument("--dry-run", action="store_true", help="옮길 파일 목록만 본다")
     args = p.parse_args()
@@ -299,4 +329,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except BrokenPipeError:      # `| head` 처럼 중간에 끊길 때
+        sys.stdout = None
+        raise SystemExit(0)
