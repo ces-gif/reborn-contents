@@ -30,6 +30,13 @@ log = logging.getLogger(__name__)
 MAX_EDGE = 1568
 JPEG_QUALITY = 82
 
+# 구글이 모델을 종료하면 404 응답에 후속 모델 이름을 알려준다.
+#   "This model models/gemini-2.5-flash is no longer available to new users.
+#    Please update your code to use models/gemini-3.6-flash ..."
+# 이 이름을 뽑아 한 번 자동으로 다시 시도한다. 안 그러면 어느 날 갑자기
+# 카드뉴스가 0장이 되는데 원인을 찾기 어렵다.
+_SUCCESSOR = re.compile(r"use\s+models/([A-Za-z0-9._-]+)")
+
 
 class LLMError(RuntimeError):
     pass
@@ -146,6 +153,15 @@ class GeminiClient(LLMClient):
         )
         return _parse_json_into(schema, raw)
 
+    def _generate(self, model: str, contents: list, config: dict):
+        from google.genai import types
+
+        return self._client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=types.GenerateContentConfig(**config),
+        )
+
     def _call(
         self, *, model: str, system: str, contents: list, max_tokens: int, schema=None, tools=None
     ) -> str:
@@ -160,15 +176,24 @@ class GeminiClient(LLMClient):
             config["response_schema"] = schema
         if tools:
             config["tools"] = tools
+            # google_search 는 서버가 알아서 도는 도구라 클라이언트 쪽 자동 함수호출이 필요 없다
+            config["automatic_function_calling"] = types.AutomaticFunctionCallingConfig(
+                disable=True
+            )
 
         try:
-            response = self._client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(**config),
-            )
+            response = self._generate(model, contents, config)
         except Exception as exc:
-            raise LLMError(f"제미나이 호출 실패({model}): {exc}") from exc
+            successor = _successor_model(exc)
+            if not successor:
+                raise LLMError(f"제미나이 호출 실패({model}): {exc}") from exc
+            log.warning("%s 모델이 종료되어 %s 로 자동 전환합니다", model, successor)
+            self.vision_model = _swap(self.vision_model, model, successor)
+            self.writing_model = _swap(self.writing_model, model, successor)
+            try:
+                response = self._generate(successor, contents, config)
+            except Exception as retry_exc:
+                raise LLMError(f"제미나이 호출 실패({successor}): {retry_exc}") from retry_exc
 
         text = getattr(response, "text", None)
         if not text:
@@ -257,6 +282,19 @@ class AnthropicClient(LLMClient):
 
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.S)
+
+
+def _successor_model(exc: Exception) -> str | None:
+    """모델 종료 오류라면 구글이 알려준 후속 모델 이름을 돌려준다."""
+    message = str(exc)
+    if "no longer available" not in message and "not found" not in message.lower():
+        return None
+    match = _SUCCESSOR.search(message)
+    return match.group(1) if match else None
+
+
+def _swap(current: str, old: str, new: str) -> str:
+    return new if current == old else current
 
 
 def _parse_json_into(schema: type[BaseModel], raw: str) -> BaseModel:
