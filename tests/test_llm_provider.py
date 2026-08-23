@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -257,14 +258,54 @@ def test_cli_returns_the_parsed_object(monkeypatch):
 
 
 def test_cli_passes_photos_as_paths_not_bytes(tmp_path, monkeypatch):
-    """사진을 다시 인코딩하지 않는다 — CLI 안의 Read 도구가 파일을 직접 연다."""
+    """사진은 바이트가 아니라 경로로 넘긴다 — CLI 안의 Read 도구가 파일을 직접 연다."""
     photo = tmp_path / "a.jpg"
-    photo.write_bytes(b"not really a jpeg")
+    Image.new("RGB", (40, 30), (200, 200, 200)).save(photo)
     client, seen = _cli(monkeypatch, stdout=json.dumps({"result": '{"name":"x","price":1}'}))
     client.structured(system="s", parts=[llm.image_part(photo)], schema=Tiny)
     prompt = seen["cmd"][2]
-    assert str(photo.resolve()) in prompt
-    assert "Read" in seen["cmd"]
+    assert ".jpg" in prompt and "Read" in seen["cmd"]
+
+
+def test_cli_straightens_rotated_photos_before_sending(tmp_path, monkeypatch):
+    """휴대폰 사진은 EXIF 로만 회전돼 있다. 누운 가격표를 넘기면 모델이 못 읽는다."""
+    photo = tmp_path / "rot.jpg"
+    # EXIF orientation 6 = 90도 돌려서 봐야 하는 사진. 픽셀은 가로(60x20)로 누워 있다.
+    img = Image.new("RGB", (60, 20), (10, 10, 10))
+    exif = img.getexif()
+    exif[274] = 6
+    img.save(photo, exif=exif)
+
+    monkeypatch.setattr(llm.shutil, "which", lambda n: "/usr/bin/claude")
+    client = llm.ClaudeCliClient(vision_model="m", writing_model="m")
+    seen: dict = {}
+
+    def peek(cmd, **kwargs):
+        # 임시 파일은 호출이 끝나면 지워지므로, 살아 있는 이 순간에 열어본다.
+        path = re.search(r"사진 파일: (\S+)", cmd[2]).group(1)
+        with Image.open(path) as opened:
+            seen["size"] = opened.size
+        return FakeRun(stdout=json.dumps({"result": '{"name":"x","price":1}'}))
+
+    monkeypatch.setattr(llm.subprocess, "run", peek)
+    client.structured(system="s", parts=[llm.image_part(photo)], schema=Tiny)
+    assert seen["size"] == (20, 60), "사진이 똑바로 세워지지 않았습니다"
+
+
+def test_cli_cleans_up_its_temp_photos(tmp_path, monkeypatch):
+    photo = tmp_path / "a.jpg"
+    Image.new("RGB", (40, 30), (200, 200, 200)).save(photo)
+    monkeypatch.setattr(llm.shutil, "which", lambda n: "/usr/bin/claude")
+    client = llm.ClaudeCliClient(vision_model="m", writing_model="m")
+    seen: dict = {}
+
+    def peek(cmd, **kwargs):
+        seen["path"] = re.search(r"사진 파일: (\S+)", cmd[2]).group(1)
+        return FakeRun(stdout=json.dumps({"result": '{"name":"x","price":1}'}))
+
+    monkeypatch.setattr(llm.subprocess, "run", peek)
+    client.structured(system="s", parts=[llm.image_part(photo)], schema=Tiny)
+    assert not Path(seen["path"]).exists()
 
 
 def test_cli_asks_for_web_search_only_when_wanted(monkeypatch):

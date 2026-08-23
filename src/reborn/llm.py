@@ -22,6 +22,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -409,9 +410,10 @@ class ClaudeCliClient(LLMClient):
         search: bool = False,
         model: str | None = None,
     ) -> BaseModel:
-        prompt = _cli_prompt(system, parts, schema, search=search)
         tools = ["Read", "WebSearch"] if search else ["Read"]
-        raw = self._run(prompt, model=model or self.writing_model, tools=tools)
+        with tempfile.TemporaryDirectory(prefix="reborn-cli-") as work:
+            prompt = _cli_prompt(system, _normalized(parts, Path(work)), schema, search=search)
+            raw = self._run(prompt, model=model or self.writing_model, tools=tools)
         return _parse_json_into(schema, raw)
 
     def _child_env(self) -> dict[str, str]:
@@ -473,6 +475,29 @@ class ClaudeCliClient(LLMClient):
         if not result:
             raise LLMError("claude CLI 가 빈 답을 돌려줬습니다")
         return result
+
+
+def _normalized(parts: Sequence[dict], work: Path) -> list[dict]:
+    """사진을 똑바로 세우고 줄여서 임시 파일로 만든다.
+
+    휴대폰 사진은 회전 정보(EXIF)만 붙어 있고 픽셀은 옆으로 누워 있는 경우가 많다.
+    원본 경로를 그대로 넘기면 모델이 **누운 가격표**를 읽게 되고, 실제로
+    "사진이 회전되어 있어 정확히 읽기 어려움" 이 리포트에 줄줄이 찍혔다.
+    (제미나이 쪽은 바이트로 넘기면서 이미 바로잡고 있었는데 여기만 빠져 있었다)
+    """
+    out: list[dict] = []
+    for i, part in enumerate(parts, start=1):
+        if part["type"] != "image":
+            out.append(part)
+            continue
+        dest = work / f"{i:03d}.jpg"
+        try:
+            dest.write_bytes(_encode_jpeg(part["path"]))
+            out.append(image_part(dest))
+        except Exception as exc:  # 못 고치면 원본이라도 넘긴다
+            log.warning("사진을 바로 세우지 못해 원본을 씁니다(%s): %s", part["path"], exc)
+            out.append(part)
+    return out
 
 
 def _cli_prompt(
