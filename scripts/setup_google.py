@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import webbrowser
 from pathlib import Path
@@ -253,7 +252,6 @@ def verify(client_id: str, client_secret: str, refresh_token: str) -> bool:
         say(f"  ✗ 발행 폴더를 만들지 못했습니다: {exc}")
 
     try:
-        from reborn import branding
         from reborn.pipeline import ensure_logo
 
         path = ensure_logo(drive, settings)

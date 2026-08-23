@@ -59,6 +59,9 @@ class Settings:
     publish_folder_name: str
     publish_parent_id: str
     logo_file_id: str
+    logo_folder_id: str
+    logo_asset: str
+    logo_wordmark: bool
 
     timezone: str
     publish_hour: int
@@ -73,6 +76,7 @@ class Settings:
     cli_vision_model: str
     cli_writing_model: str
 
+    store_id: str
     store_name: str
     store_handle: str
     footer_note: str
@@ -128,11 +132,56 @@ class Settings:
 
 
 def load_settings(path: Path | str | None = None) -> Settings:
-    path = Path(path) if path else DEFAULT_SETTINGS
-    data: dict = {}
-    if path.exists():
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    """첫 번째 매장의 설정. 매장이 하나였을 때부터 쓰던 입구다."""
+    return load_stores(path)[0]
 
+
+def load_stores(path: Path | str | None = None) -> list[Settings]:
+    """매장별 설정을 순서대로 돌려준다.
+
+    리본마켓 평택점과 여우마켓 일산점처럼 매장이 여럿이면 settings.yaml 의
+    `stores:` 에 매장마다 다른 값만 적는다. 나머지는 공통 설정을 그대로 쓴다.
+    같은 파이프라인을 매장 수만큼 돌리는 구조라 매장이 더 늘어도 코드는 그대로다.
+    """
+    data = _read_yaml(path)
+    stores = data.get("stores") or []
+    if not stores:
+        return [_settings_from(data)]
+
+    only = _env("ONLY_STORE")  # 한 매장만 급히 돌릴 때
+    built = []
+    for entry in stores:
+        merged = _deep_merge(data, {k: v for k, v in entry.items() if k != "id"})
+        merged.pop("stores", None)
+        settings = _settings_from(merged)
+        settings.store_id = entry.get("id") or settings.store_name
+        if only and only not in (settings.store_id, settings.store_name):
+            continue
+        built.append(settings)
+    if not built:
+        raise ValueError(f"ONLY_STORE={only!r} 에 해당하는 매장이 설정에 없습니다")
+    return built
+
+
+def _read_yaml(path: Path | str | None) -> dict:
+    path = Path(path) if path else DEFAULT_SETTINGS
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _deep_merge(base: dict, over: dict) -> dict:
+    """매장별 설정을 공통 설정 위에 덮는다 (한 단계 아래까지)."""
+    out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in base.items()}
+    for key, value in over.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = {**out[key], **value}
+        else:
+            out[key] = value
+    return out
+
+
+def _settings_from(data: dict) -> Settings:
     drive = data.get("drive", {}) or {}
     schedule = data.get("schedule", {}) or {}
     grouping = data.get("grouping", {}) or {}
@@ -149,6 +198,12 @@ def load_settings(path: Path | str | None = None) -> Settings:
         ),
         publish_parent_id=_env("PUBLISH_PARENT_ID", drive.get("publish_parent_id", "") or ""),
         logo_file_id=_env("LOGO_FILE_ID", drive.get("logo_file_id", "") or ""),
+        # 로고 파일을 직접 지정하는 대신 폴더를 지정하면, 그 안의 최신 이미지를 쓴다.
+        # 새 매장이 로고를 드라이브에 넣기만 하면 다음 실행부터 바로 반영된다.
+        logo_folder_id=_env("LOGO_FOLDER_ID", drive.get("logo_folder_id", "") or ""),
+        logo_asset=str(drive.get("logo_asset", "") or ""),
+        # 로고 파일이 아직 없는 매장만 true. 매장 이름을 글자로 찍는다.
+        logo_wordmark=bool(drive.get("logo_wordmark", False)),
         timezone=_env("TIMEZONE", schedule.get("timezone", "Asia/Seoul")),
         publish_hour=_env_int("PUBLISH_HOUR", int(schedule.get("publish_hour", 18))),
         max_gap_seconds=_env_int("MAX_GAP_SECONDS", int(grouping.get("max_gap_seconds", 150))),
@@ -161,6 +216,7 @@ def load_settings(path: Path | str | None = None) -> Settings:
         writing_model=_env("WRITING_MODEL", model.get("writing", "gemini-3.6-flash")),
         cli_vision_model=_env("CLI_VISION_MODEL", model.get("cli_vision", "claude-sonnet-5")),
         cli_writing_model=_env("CLI_WRITING_MODEL", model.get("cli_writing", "claude-sonnet-5")),
+        store_id=str(store.get("id", "") or store.get("name", "매장")),
         store_name=_env("STORE_NAME", store.get("name", "리본마켓 평택점")),
         store_handle=_env("STORE_HANDLE", store.get("handle", "@reborn.mk")),
         footer_note=_env("FOOTER_NOTE", store.get("footer_note", "")),

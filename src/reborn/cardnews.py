@@ -97,16 +97,33 @@ def _strikethrough(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, fnt, fi
     draw.line([(x - 4, line_y), (x + tw + 4, line_y)], fill=fill, width=max(3, fnt.size // 18))
 
 
-def render_card(data: CardData, photo_path: Path, out_path: Path, *, strict_logo: bool = True) -> Path:
+def _logo_image(logo, strict_logo: bool) -> Image.Image:
+    """카드 좌상단에 얹을 로고 이미지."""
+    if isinstance(logo, Image.Image):  # 글자 로고(신규 매장) 등 이미 만들어진 것
+        img = logo
+        ratio = LOGO_H / img.height
+        return img.resize((max(1, round(img.width * ratio)), LOGO_H), Image.LANCZOS)
+    return B.load_logo(LOGO_H, strict=strict_logo, path=logo)
+
+
+def render_card(
+    data: CardData,
+    photo_path: Path,
+    out_path: Path,
+    *,
+    strict_logo: bool = True,
+    logo: Path | str | Image.Image | None = None,
+) -> Path:
+    """카드뉴스 한 장. logo 를 주면 그 로고를 쓴다 (매장마다 로고가 다르다)."""
     canvas = Image.new("RGB", (W, H), B.BG)
     draw = ImageDraw.Draw(canvas)
 
     # 1) 상단 오렌지 액센트 바 (꽉 참)
     draw.rectangle([0, 0, W, Y_ACCENT_BAR], fill=B.ORANGE)
 
-    # 2) 로고 (실제 PNG). 로고가 없으면 여기서 예외 → 텍스트로 대체하지 않는다.
-    logo = B.load_logo(LOGO_H, strict=strict_logo)
-    canvas.paste(logo, (MARGIN, Y_LOGO), logo)
+    # 2) 로고. 로고가 없으면 여기서 예외 → 있는 매장의 로고를 멋대로 글자로 대체하지 않는다.
+    mark = _logo_image(logo, strict_logo)
+    canvas.paste(mark, (MARGIN, Y_LOGO), mark)
 
     # 3) 날짜 뱃지 (우상단)
     if data.date_label:

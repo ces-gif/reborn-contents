@@ -7,7 +7,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from .config import ASSETS, FONTS, REPO_ROOT
 
@@ -106,13 +106,36 @@ def trim_margins(img: Image.Image, *, tolerance: int = 12) -> Image.Image:
     return img.crop(bbox) if bbox else img
 
 
-def load_logo(height: int, *, max_width: int | None = None, strict: bool = True) -> Image.Image:
+def wordmark(text: str, height: int) -> Image.Image:
+    """로고 파일이 아직 없는 매장을 위한 임시 글자 로고.
+
+    **로고가 있는 매장에는 절대 쓰지 않는다.** 진짜 로고를 글자로 흉내내면
+    브랜드가 망가진다. 새로 연 매장이 로고 파일을 올리기 전까지만,
+    설정에서 logo_wordmark 를 켠 매장에 한해 쓴다.
+    """
+    fnt = font("extrabold", max(12, int(height * 0.86)))
+    ascent, descent = fnt.getmetrics()
+    canvas = Image.new("RGBA", (1, 1))
+    width = int(ImageDraw.Draw(canvas).textlength(text, font=fnt))
+    img = Image.new("RGBA", (width + 8, ascent + descent), (0, 0, 0, 0))
+    ImageDraw.Draw(img).text((4, 0), text, font=fnt, fill=(*SLATE, 255))
+    return img
+
+
+def load_logo(
+    height: int,
+    *,
+    max_width: int | None = None,
+    strict: bool = True,
+    path: Path | str | None = None,
+) -> Image.Image:
     """여백을 잘라내고 원하는 높이로 맞춘 로고.
 
+    path 를 주면 그 파일을 쓴다 (매장마다 로고가 다르다).
     가로로 긴 워드마크형 로고는 max_width 를 넘지 않도록 더 줄인다
     (카드뉴스 우상단 날짜 뱃지를 침범하지 않게).
     """
-    img = trim_margins(Image.open(logo_path(strict=strict)))
+    img = trim_margins(Image.open(path if path else logo_path(strict=strict)))
     ratio = height / img.height
     width = max(1, round(img.width * ratio))
     if max_width and width > max_width:

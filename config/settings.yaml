@@ -1,5 +1,9 @@
-# 리본마켓 자동 콘텐츠 발행 설정
-# 대부분의 값은 같은 이름의 대문자 환경변수로 덮어쓸 수 있습니다. (예: PUBLISH_FOLDER_NAME)
+# 매장 자동 콘텐츠 발행 설정
+#
+# 아래 drive/store/card 값은 **공통 기본값**이고, 맨 끝 `stores:` 에서 매장마다
+# 다른 것만 덮어씁니다. 매장을 더 늘리려면 stores 에 항목 하나만 추가하면 됩니다.
+# 대부분의 값은 같은 이름의 대문자 환경변수로도 덮어쓸 수 있습니다.
+# (환경변수는 모든 매장에 똑같이 적용되니 매장별 값에는 쓰지 마세요)
 
 drive:
   # 상품 사진이 올라오는 폴더들. 폴더마다 성격이 달라서 문구가 달라진다.
@@ -80,3 +84,57 @@ instagram:
   max_stories_per_day: 10
   # 스토리 사이 간격(초). 한꺼번에 쏟아붓지 않게 띄운다.
   delay_between_seconds: 20
+
+# ---------------------------------------------------------------- 매장 목록
+# 위 공통 설정 위에 매장마다 다른 값만 덮어쓴다. 하루 실행에서 순서대로 다 돈다.
+stores:
+  - id: "reborn-pt"
+    drive:
+      sources:
+        - name: "리퍼"
+          folder_id: "1oAEi2LrzoOSlDO1TwVDpVWdb771wHdqz"
+          kind: "refurb"
+          eyebrow: "오늘의 리본 특가"
+        - name: "새상품"
+          folder_id: "17EZH2F7VgEHbc4mHfNmS2nI9RBI-sCmR"
+          kind: "new"
+          eyebrow: "제조사 직거래 새상품"
+      publish_parent_id: "12Fm_4Srlwcjw-d58F7qsOh9OdqxmB1D7"
+      logo_file_id: "1WWB5_20er3Sjn49svz-ghvcNKRbC90ba"
+      logo_wordmark: false   # 진짜 로고가 있는 매장은 글자로 대체하지 않는다
+    store:
+      id: "reborn-pt"
+      name: "리본마켓 평택점"
+      handle: "@reborn.mk"
+      footer_note: "매장 재고는 한정 수량, 소진 시 조기 종료됩니다"
+      visit_line: "리본마켓 평택점 · 매장에서 직접 보고 구매하세요"
+    card:
+      sale_label: "리본마켓 초특가"
+
+  - id: "fox-ils"
+    drive:
+      sources:
+        - name: "리퍼"
+          folder_id: "1oxozGTLaw9vOeBEVH8k2vjNrmK7oguuS"
+          kind: "refurb"
+          eyebrow: "오늘의 여우 특가"
+        - name: "새상품"
+          folder_id: "1_24Im3H2vLJX74kC673194ltU0oCb87j"
+          kind: "new"
+          eyebrow: "제조사 직거래 새상품"
+      publish_parent_id: "1dp2MUHe8YtN6iCDBOXLhjGjM54J8UOuk"
+      # 여우마켓 로고는 아직 없다. 드라이브 '여우마켓 일산점/로고' 폴더에 PNG 를 넣으면
+      # 그날 실행부터 자동으로 카드뉴스에 들어간다 (파일 ID 를 따로 적을 필요 없다).
+      logo_file_id: ""
+      logo_folder_id: "1oSGcj68OFfDTbtPQkbeuVMEJyolPorib"
+      # 로고 PNG 가 올라오기 전까지는 매장 이름을 글자로 넣는다 (그래야 첫날부터 카드가 나온다).
+      # 로고 폴더에 PNG 를 올리면 그날부터 자동으로 진짜 로고로 바뀐다.
+      logo_wordmark: true
+    store:
+      id: "fox-ils"
+      name: "여우마켓 일산점"
+      handle: "@foxmarket.ils"
+      footer_note: "매장 재고는 한정 수량, 소진 시 조기 종료됩니다"
+      visit_line: "여우마켓 일산점 · 매장에서 직접 보고 구매하세요"
+    card:
+      sale_label: "여우마켓 초특가"

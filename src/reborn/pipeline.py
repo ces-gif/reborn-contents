@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -23,7 +24,7 @@ from . import branding, instagram, llm, notify, research, social
 from .llm import LLMQuotaError
 from .blog import write_post
 from .cardnews import CardData, render_card
-from .config import Settings, Source
+from .config import ASSETS, Settings, Source
 from .drive import Drive, DriveFile, upload_tree
 from .grouping import capture_time, filter_for_day, group_by_content
 from .ranking import pick_best
@@ -43,6 +44,7 @@ def slugify(text: str, max_len: int = 28) -> str:
 @dataclass
 class RunResult:
     day: date
+    store_name: str = ""
     photos_seen: int = 0
     groups: int = 0
     products: list[Product] = field(default_factory=list)
@@ -70,20 +72,63 @@ def make_llm(settings: Settings):
     return llm.make_client(settings)
 
 
-def ensure_logo(drive: Drive | None, settings: Settings) -> Path:
-    """실제 리본마켓 로고를 확보한다. 저장소 파일이 있으면 그걸 쓰고, 없으면 드라이브에서 받는다."""
+def ensure_logo(drive: Drive | None, settings: Settings):
+    """이 매장의 로고를 확보한다.
+
+    매장마다 로고가 다르므로 **매장별로** 찾고 매장별 경로에 캐시한다.
+    한 매장의 로고가 다른 매장 카드에 찍히면 안 된다.
+
+    찾는 순서:
+      1. REBORN_LOGO_PATH 환경변수 (테스트·임시 교체용)
+      2. 설정의 logo_asset — 저장소에 동봉한 파일
+      3. 드라이브 logo_file_id — 지정한 파일
+      4. 드라이브 logo_folder_id — 그 폴더의 최신 이미지
+         (새 매장은 로고를 이 폴더에 넣기만 하면 다음 실행부터 반영된다)
+      5. logo_wordmark 를 켠 매장이면 매장 이름을 글자로 (로고가 아직 없는 신규 매장만)
+    """
+    override = os.environ.get(branding.LOGO_ENV_PATH)
+    if override and Path(override).exists():
+        return Path(override)
+
+    if settings.logo_asset:
+        asset = ASSETS / settings.logo_asset
+        if asset.exists() and asset.stat().st_size > 0:
+            return asset
+
+    cache = branding.REPO_ROOT / ".cache" / f"logo-{slugify(settings.store_id)}.png"
+    file_id = settings.logo_file_id or _newest_image_id(drive, settings.logo_folder_id)
+    if drive is not None and file_id:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        drive.download(file_id, cache)
+        _verify_png(cache)
+        log.info("[%s] 로고 내려받음: %s (%d bytes)", settings.store_name, cache, cache.stat().st_size)
+        return cache
+    if cache.exists() and cache.stat().st_size > 0:
+        return cache
+
+    if settings.logo_wordmark:
+        log.warning(
+            "[%s] 로고 파일이 아직 없어 매장 이름을 글자로 넣습니다. "
+            "드라이브 '로고' 폴더에 PNG 를 올리면 다음 실행부터 진짜 로고가 들어갑니다.",
+            settings.store_name,
+        )
+        return branding.wordmark(settings.store_name, 200)
+
+    return branding.logo_path()  # LogoMissing 을 그대로 던진다
+
+
+def _newest_image_id(drive: Drive | None, folder_id: str) -> str:
+    """로고 폴더에서 가장 최근에 올라온 이미지 하나."""
+    if drive is None or not folder_id:
+        return ""
     try:
-        return branding.logo_path()
-    except branding.LogoMissing:
-        pass
-    if drive is None or not settings.logo_file_id:
-        return branding.logo_path()  # LogoMissing 을 그대로 던진다
-    cache = branding.LOGO_CACHE
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    drive.download(settings.logo_file_id, cache)
-    _verify_png(cache)
-    log.info("리본마켓 로고 내려받음: %s (%d bytes)", cache, cache.stat().st_size)
-    return cache
+        images = drive.list_children(folder_id, only_images=True)
+    except Exception as exc:  # 로고 폴더가 없거나 권한이 없어도 발행은 계속한다
+        log.warning("로고 폴더를 읽지 못했습니다(%s): %s", folder_id, exc)
+        return ""
+    if not images:
+        return ""
+    return max(images, key=lambda f: f.created_time).id
 
 
 def _verify_png(path: Path) -> None:
@@ -124,10 +169,12 @@ def run(
 ) -> RunResult:
     zone = ZoneInfo(settings.timezone)
     target_day = day or datetime.now(zone).date()
-    result = RunResult(day=target_day)
+    # 매장별로 작업 폴더를 나눈다. 안 나누면 두 매장의 001-xxx.jpg 가 서로 덮어쓴다.
+    work_root = work_root / slugify(settings.store_id)
+    result = RunResult(day=target_day, store_name=settings.store_name)
 
     drive = Drive()
-    ensure_logo(drive, settings)
+    logo = ensure_logo(drive, settings)
 
     publish_root = (
         _find_publish_root(drive, settings) if dry_run else _ensure_publish_root(drive, settings)
@@ -280,7 +327,7 @@ def run(
             / slugify(product.source_name)
             / f"{counters[product.source_name]:02d}-{slugify(product.product_name)}.png"
         )
-        render_card(card, product.best_photo, path)
+        render_card(card, product.best_photo, path, logo=logo)
         result.cards.append(path)
 
     # 5) BEST5 블로그 ---------------------------------------------------------
@@ -407,7 +454,7 @@ def _load_ledger(drive: Drive, publish_root: str, work_root: Path) -> Ledger:
 
 def _report(result: RunResult, settings: Settings) -> str:
     lines = [
-        f"# {result.day} 리본마켓 콘텐츠 자동 발행 리포트",
+        f"# {result.day} {result.store_name or '매장'} 콘텐츠 자동 발행 리포트",
         "",
         f"- 사진: {result.photos_seen}장 ("
         + ", ".join(f"{name} {n}장" for name, n in result.per_source.items())
@@ -458,11 +505,12 @@ def _report(result: RunResult, settings: Settings) -> str:
 
 
 def print_summary(result: RunResult) -> None:
+    who = f"{result.store_name} " if result.store_name else ""
     if result.skipped_reason:
-        print(f"⏭  {result.day}: {result.skipped_reason}")
+        print(f"⏭  {who}{result.day}: {result.skipped_reason}")
         return
     counts = ", ".join(f"{name} {n}장" for name, n in result.per_source.items())
-    print(f"✅ {result.day} 완료")
+    print(f"✅ {who}{result.day} 완료")
     print(f"   사진 {result.photos_seen}장 ({counts}) → 상품 {result.groups}개 → 카드뉴스 {len(result.cards)}장")
     if result.blog_files:
         print(f"   블로그: {result.blog_files[0].name} (+ 네이버 붙여넣기용 HTML)")
