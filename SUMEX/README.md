@@ -213,6 +213,32 @@ node tools/node/test/render.test.mjs         # 대시보드 렌더링
 
 ---
 
+## Hugging Face — 기계가 읽는 사본
+
+깃허브는 사람이 읽고 고치는 곳이고, Hugging Face 는 기계가 읽는 곳으로 쓴다.
+나중에 이 지식베이스로 RAG 를 붙이거나 신입 교육용 QA 를 만들 때 필요하다.
+
+```bash
+pip install huggingface_hub
+python3 scripts/publish_hf.py --check        # 올리기 전 안전 점검만 (토큰 불필요)
+
+export HF_TOKEN=hf_xxxxx                     # write 권한
+python3 scripts/publish_hf.py                # 비공개 데이터셋으로 발행
+```
+
+올라가는 것: `knowledge/*.md` 8편 + `data/*.yaml` + 검색용 `sumex_kb.jsonl`
+(교육자료를 섹션 단위로, 거래처·품목을 항목 단위로 쪼갠 150행).
+
+**기본값이 비공개다.** 사내 교육용 대외비이고 거래처 이름이 들어 있어서,
+`--public` 을 명시하고 확인 입력을 해야만 공개로 만들어진다.
+발행 전에 연락처·이메일이 섞였는지 스스로 검사하고, 하나라도 걸리면 중단한다.
+`data/private/`, `templates/`, `out/` 은 어떤 경우에도 올라가지 않는다.
+
+> 토큰이 필요한 이유: Claude 의 Hugging Face 연결은 읽기 전용이라
+> 저장소 생성·업로드를 대신 해줄 수 없다. 한 번만 실행하면 된다.
+
+---
+
 ## 자료 출처
 
 - 전임자 인수인계서 (거래처별 납품 프로세스·특이사항)
