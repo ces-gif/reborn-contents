@@ -1,7 +1,0 @@
-accounts:
-  - hospital: seoul-spine
-    monthly_revenue: 7000000
-    supply_model: 렌트
-    discount_history: "과거 25% 할인 공급 이력"
-    loss_history: "파손·오사용 손실 누적 100만원"
-    note: 내부 판단용 민감 메모
