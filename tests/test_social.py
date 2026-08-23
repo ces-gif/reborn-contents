@@ -6,9 +6,9 @@ from reborn.vision import Product
 
 def p(name, orig, sale):
     return Product(
-        is_product=True, product_name=name, one_liner="박스만 개봉한 미사용품", category="가전",
-        original_price=orig, sale_price=sale, discount_pct=None, price_source="가격표",
-        best_photo_index=1, appeal="", needs_review=False, review_reason="",
+        product_name=name, category="가전", spec_line="6인용 IH 압력밥솥",
+        original_price=orig, sale_price=sale, price_source="가격표",
+        best_photo_index=1, photo_kinds=["both"], photo_paths=["a.jpg"],
     )
 
 

@@ -33,8 +33,8 @@ def kakao_notice(products: list[Product], *, day: date, store_name: str, footer_
     ]
     for i, p in enumerate(products, start=1):
         lines.append(f"{i}. {p.product_name}")
-        if p.one_liner:
-            lines.append(f"   {p.one_liner}")
+        if p.card_line:
+            lines.append(f"   {p.card_line}")
         lines.append("   " + _price_block(p).replace("\n", "\n   "))
         lines.append("")
     lines += [

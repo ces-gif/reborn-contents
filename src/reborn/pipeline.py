@@ -14,7 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import branding, notify, social
+from . import branding, notify, research, social
 from .blog import write_post
 from .cardnews import CardData, render_card
 from .config import ASSETS, Settings
@@ -161,22 +161,27 @@ def run(
             log.error("상품 %d번 정보 추출 실패: %s", group.index, exc)
             continue
         log.info(
-            "  [%02d] %s | %s → %s | 검토필요=%s",
+            "  [%02d] %s | 사진 %s | %s → %s | 검토필요=%s %s",
             group.index,
             product.product_name,
+            "+".join(product.photo_kinds),
             product.original_price,
             product.sale_price,
             product.needs_review,
+            product.review_reason,
         )
         result.products.append(product)
         if not product.publishable:
             result.needs_review.append(product)
 
+    # 3-2) 인터넷에서 제품을 찾아 짧은 설명을 붙인다 (확인 안 되면 안 붙인다)
+    research.research_all(client, result.products, model=settings.writing_model)
+
     # 4) 카드뉴스 만들기 ------------------------------------------------------
     for order, product in enumerate(result.published, start=1):
         card = CardData(
             product_name=product.product_name,
-            one_liner=product.one_liner,
+            one_liner=product.card_line,
             sale_price=product.sale_price,
             original_price=product.original_price,
             discount_pct=product.discount_pct,
@@ -315,13 +320,21 @@ def _report(result: RunResult, settings: Settings) -> str:
     for i, p in enumerate(result.published, start=1):
         pct = f" ({p.computed_pct}%↓)" if p.computed_pct else ""
         orig = f"{p.original_price:,}원 → " if p.original_price else ""
-        lines.append(f"{i}. {p.product_name} — {orig}{p.sale_price:,}원{pct}  · 근거: {p.price_source}")
+        lines.append(f"{i}. {p.product_name} — {orig}{p.sale_price:,}원{pct}")
+        lines.append(f"   · 가격 근거: {p.price_source}")
+        lines.append(
+            "   · 제품 설명: "
+            + (f"웹 확인됨 — {p.spec_line}" if p.research_matched else "검색으로 특정 못 함 (설명 없음)")
+        )
+        if p.condition_note:
+            lines.append(f"   · 가격표에 적힌 상태: {p.condition_note}")
     if result.needs_review:
         lines += ["", "## 사람이 확인해야 하는 건 (카드뉴스 미생성)"]
         for p in result.needs_review:
             lines.append(
-                f"- {p.product_name or '(상품 아님)'} — {p.review_reason or '상품 사진이 아님'}"
+                f"- {p.product_name or '(상품명 불명)'} — {p.review_reason or '사유 미상'}"
                 f"  · 사진: {', '.join(Path(x).name for x in p.photo_paths)}"
+                f" ({'+'.join(p.photo_kinds) or '?'})"
             )
     lines += ["", f"생성 시각 기준 매장: {settings.store_name}"]
     return "\n".join(lines) + "\n"

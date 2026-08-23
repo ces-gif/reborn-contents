@@ -1,8 +1,15 @@
-"""상품 사진에서 상품명 / 정가 / 할인가 / 한 줄 소개를 읽어낸다.
+"""상품 사진에서 상품명 / 정가 / 할인가를 읽어낸다.
 
-원칙 (기존 리본마켓 스킬의 규칙을 그대로 따른다):
+은성님 촬영 방식에 맞춘 설계:
+  - 가격표 사진 1장 + 상품 사진 1장  (연속 촬영이라 하나로 묶인다)
+  - 또는 가격표와 상품이 한 장에 같이 나온 사진 1장
+
+원칙 (기존 리본마켓 스킬 규칙 + 2026-08-23 은성님 지시):
 - 가격은 사진 속 가격표에서 읽은 것만 쓴다. 안 보이면 지어내지 않고 needs_review 로 넘긴다.
-- 사진에 안 보이는 스펙은 쓰지 않는다.
+- **상태 표현("미사용", "전시상품", "박스 개봉" 등)은 가격표에 적혀 있을 때만 쓴다.**
+  사진만 보고 상태를 추측해서 적지 않는다.
+- 카드뉴스에 쓸 사진은 반드시 '상품이 보이는 사진'이어야 한다.
+  묶음에 가격표 사진밖에 없으면 그건 정보 전달용이므로 카드뉴스를 만들지 않는다.
 - "중고" 라는 표현은 절대 쓰지 않는다 (리퍼브 = 검수된 새 상품).
 """
 
@@ -12,131 +19,165 @@ import base64
 import io
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from PIL import Image, ImageOps
+from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
 MAX_EDGE = 1568  # Claude 비전 입력 권장 최대 변
 JPEG_QUALITY = 82
 
+PhotoKind = Literal["price_tag", "product", "both", "other"]
+
+# 가격표에 근거 없이 쓰면 안 되는 상태 표현들 (은성님 지시: "정보가 없으면 함부로 적지마").
+# 같은 패턴이 가격표 원문(tag_text)에서도 잡히면 근거가 있는 것으로 보고 남긴다.
+CLAIM_PATTERNS = [
+    re.compile(pattern)
+    for pattern in (
+        r"미사용",
+        r"새\s?(제품|상품|것)",
+        r"미개봉",
+        r"(박스|단순|포장)?\s?개봉",
+        r"전시\s?(상품|품)?",
+        r"반품",
+        r"리퍼(브)?",
+        r"[A-Sa-s]\s?급",
+        r"스크래치",
+        r"흠집",
+        r"파손",
+        r"사용감",
+        r"정품",
+        r"보증",
+        r"무상\s?A/?S",
+    )
+]
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?。])\s+|\n+")
+
+
+class PhotoRead(BaseModel):
+    index: int = Field(description="사진 번호 (1부터)")
+    kind: PhotoKind = Field(
+        description=(
+            "price_tag=가격표만 찍힘, product=상품만 찍힘, "
+            "both=상품과 가격표가 한 장에 같이 찍힘, other=둘 다 아님"
+        )
+    )
+
+
+class ProductRead(BaseModel):
+    """비전 모델이 사진에서 읽어내는 것 — 사진에 실제로 보이는 것만."""
+
+    photos: list[PhotoRead] = Field(description="사진마다 무엇이 찍혔는지. 준 사진 수와 같아야 한다.")
+    product_name: str = Field(description="가격표에 적힌 상품명 그대로. 없으면 제품의 브랜드/모델명.")
+    tag_text: str = Field(
+        description=(
+            "가격표에 적힌 글자를 보이는 대로 옮겨 적은 것. 상태 표기(전시상품 등)도 있으면 포함. "
+            "가격표가 없으면 빈 문자열."
+        )
+    )
+    condition_note: str = Field(
+        description=(
+            "가격표에 상품 상태가 적혀 있으면 그 표현만 그대로. "
+            "가격표에 상태 표기가 없으면 반드시 빈 문자열. 사진만 보고 추측해서 쓰지 말 것."
+        )
+    )
+    category: str = Field(description="가전 / 가구 / 주방 / 홈리빙 / 육아 / 반려 / 기타 중 하나")
+    original_price: int | None = Field(description="가격표에 적힌 할인 전 가격(정가·온라인가). 없으면 null.")
+    sale_price: int | None = Field(description="가격표에 적힌 리본마켓 판매가. 없으면 null.")
+    discount_pct: int | None = Field(description="가격표에 할인율이 직접 적혀 있으면 그 숫자. 없으면 null.")
+    price_source: str = Field(description="가격을 어디서 읽었는지. 예: '2번 사진 가격표', '읽을 수 없음'")
+    best_photo_index: int = Field(
+        description=(
+            "카드뉴스에 쓸 사진 번호(1부터). 반드시 kind 가 product 또는 both 인 사진 중에서 고른다. "
+            "상품이 보이는 사진이 하나도 없으면 0."
+        )
+    )
+    needs_review: int | None = Field(
+        default=None, description="사용하지 않음 (호환용). review_reason 으로 판단한다."
+    )
+    review_reason: str = Field(
+        description="사람이 확인해야 할 이유가 있으면 적는다. 없으면 빈 문자열."
+    )
+
+
 SYSTEM = """당신은 리본마켓 평택점의 콘텐츠 담당자입니다.
 리본마켓은 리퍼브(검수를 마친 새 상품) 전문 매장입니다. "중고"라는 단어는 절대 쓰지 않습니다.
 
-매장에서 찍은 상품 사진 여러 장(같은 상품을 여러 각도에서 찍은 것)을 보고,
-카드뉴스에 쓸 정보를 뽑아냅니다.
+매장에서 찍은 사진을 보고 카드뉴스에 쓸 정보를 뽑아냅니다.
+사진은 보통 이렇게 들어옵니다:
+  - 가격표 사진 1장 + 상품 사진 1장
+  - 또는 가격표와 상품이 한 장에 같이 나온 사진 1장
 
 절대 규칙:
-1. 가격은 사진 속 가격표/POP에 실제로 적혀 있는 숫자만 씁니다. 추정·검색·상식으로 지어내지 않습니다.
-2. 가격표에 정가(온라인 판매가)와 할인가가 둘 다 보이면 둘 다 적습니다.
-   하나만 보이면 그 하나만 적고 나머지는 null 로 둡니다.
-3. 가격을 하나도 읽을 수 없으면 needs_review 를 true 로 하고 review_reason 에 이유를 적습니다.
-4. 한 줄 소개는 사진에서 실제로 확인되는 것(제품 종류, 색상, 구성품, 가격표에 적힌 문구)만 근거로 씁니다.
-   보이지 않는 스펙(용량, 소비전력, 연식 등)은 사진이나 가격표에 적혀 있지 않으면 쓰지 않습니다.
-5. 상품명은 가격표에 적힌 그대로를 우선합니다. 가격표에 없으면 사진 속 제품의 브랜드/로고/모델명으로 씁니다.
-6. 상품이 아닌 사진(매장 전경, 간판, 영수증, 사람만 있는 사진 등)이면 is_product 를 false 로 합니다."""
+1. 가격은 사진 속 가격표/POP 에 실제로 적혀 있는 숫자만 씁니다. 추정·검색·상식으로 지어내지 않습니다.
+2. 가격표에 정가와 할인가가 둘 다 보이면 둘 다 적습니다. 하나만 보이면 그 하나만 적고 나머지는 null 로 둡니다.
+3. 가격을 하나도 읽을 수 없으면 review_reason 에 이유를 적습니다.
+4. **상품 상태를 지어내지 않습니다.** "미사용", "전시상품", "박스만 개봉", "새것 같은" 같은 표현은
+   가격표에 그렇게 적혀 있을 때만 condition_note 에 그대로 옮겨 적습니다.
+   가격표에 상태 표기가 없으면 condition_note 는 반드시 빈 문자열입니다.
+   사진에 박스가 보인다거나 깨끗해 보인다는 이유로 상태를 단정하지 않습니다.
+5. tag_text 에는 가격표에서 읽은 글자를 보이는 대로 옮겨 적습니다 (나중에 근거 확인용).
+6. best_photo_index 는 상품이 보이는 사진(kind 가 product 또는 both) 중에서 고릅니다.
+   가격표만 찍힌 사진은 카드뉴스 배경으로 쓰지 않습니다.
+   상품이 보이는 사진이 하나도 없으면 0 을 넣습니다.
+7. 상품명은 가격표 표기를 우선합니다. 가격표에 없으면 사진 속 제품의 브랜드/로고/모델명으로 씁니다."""
 
 USER_TEMPLATE = """아래는 같은 상품을 찍은 사진 {n}장입니다 (1번부터 순서대로).
-가격표가 찍혀 있으면 거기 적힌 상품명과 가격을 그대로 읽어주세요.
-
-extract_product 도구를 정확히 한 번 호출해서 결과를 주세요."""
-
-TOOL = {
-    "name": "extract_product",
-    "description": "사진에서 읽어낸 상품 정보를 구조화해서 돌려준다.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "is_product": {
-                "type": "boolean",
-                "description": "판매 상품 사진이면 true. 매장 전경/간판/영수증 등이면 false.",
-            },
-            "product_name": {
-                "type": "string",
-                "description": "카드뉴스에 넣을 상품명. 가격표 표기 우선. 30자 이내 권장.",
-            },
-            "one_liner": {
-                "type": "string",
-                "description": "사진에서 확인되는 사실만 담은 한 줄 소개. 40자 이내. '중고' 금지.",
-            },
-            "category": {
-                "type": "string",
-                "description": "가전 / 가구 / 주방 / 홈리빙 / 육아 / 반려 / 기타 중 하나",
-            },
-            "original_price": {
-                "type": ["integer", "null"],
-                "description": "가격표에 적힌 할인 전 가격(정가·온라인 판매가). 없으면 null.",
-            },
-            "sale_price": {
-                "type": ["integer", "null"],
-                "description": "가격표에 적힌 리본마켓 판매가. 없으면 null.",
-            },
-            "discount_pct": {
-                "type": ["integer", "null"],
-                "description": "가격표에 할인율이 직접 적혀 있으면 그 숫자. 없으면 null (계산은 우리가 한다).",
-            },
-            "price_source": {
-                "type": "string",
-                "description": "가격을 어디서 읽었는지. 예: '3번 사진 가격표', '읽을 수 없음'",
-            },
-            "best_photo_index": {
-                "type": "integer",
-                "description": "카드뉴스에 쓸 가장 좋은 사진 번호(1부터). 상품이 크게, 배경이 깔끔한 것.",
-            },
-            "appeal": {
-                "type": "string",
-                "description": "이 상품이 잘 팔릴 만한 이유 한 문장 (블로그 BEST5 선정 근거로 쓴다).",
-            },
-            "needs_review": {
-                "type": "boolean",
-                "description": "가격을 못 읽었거나 확신이 없어 사람이 확인해야 하면 true.",
-            },
-            "review_reason": {
-                "type": "string",
-                "description": "needs_review 가 true 인 이유. 아니면 빈 문자열.",
-            },
-        },
-        "required": [
-            "is_product",
-            "product_name",
-            "one_liner",
-            "category",
-            "original_price",
-            "sale_price",
-            "discount_pct",
-            "price_source",
-            "best_photo_index",
-            "appeal",
-            "needs_review",
-            "review_reason",
-        ],
-    },
-}
+사진마다 가격표인지 상품인지 구분하고, 가격표에 적힌 상품명과 가격을 그대로 읽어주세요.
+가격표에 없는 상품 상태는 적지 마세요."""
 
 
 @dataclass
 class Product:
-    is_product: bool
+    """파이프라인이 실제로 들고 다니는 상품 정보."""
+
     product_name: str
-    one_liner: str
     category: str
-    original_price: int | None
-    sale_price: int | None
-    discount_pct: int | None
-    price_source: str
-    best_photo_index: int
-    appeal: str
-    needs_review: bool
-    review_reason: str
+    tag_text: str = ""
+    condition_note: str = ""
+    original_price: int | None = None
+    sale_price: int | None = None
+    discount_pct: int | None = None
+    price_source: str = ""
+    best_photo_index: int = 0
+    photo_kinds: list[str] = field(default_factory=list)
+    needs_review: bool = False
+    review_reason: str = ""
+
+    # 웹 검색으로 채워지는 부분 (research.py)
+    spec_line: str = ""
+    description: str = ""
+    key_points: list[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
+    research_matched: bool = False
+
     photo_paths: list[str] = field(default_factory=list)
     source_file_ids: list[str] = field(default_factory=list)
     group_index: int = 0
 
+    # ------------------------------------------------------------------ 파생
+
+    @property
+    def has_product_photo(self) -> bool:
+        return any(k in ("product", "both") for k in self.photo_kinds)
+
     @property
     def best_photo(self) -> Path:
-        idx = max(1, min(self.best_photo_index, len(self.photo_paths)))
+        """카드뉴스 배경으로 쓸 사진. 반드시 상품이 보이는 사진."""
+        product_indexes = [
+            i for i, k in enumerate(self.photo_kinds, start=1) if k in ("product", "both")
+        ]
+        idx = self.best_photo_index
+        if idx not in product_indexes:
+            idx = product_indexes[0] if product_indexes else 0
+        if not idx:
+            raise ValueError(f"상품이 보이는 사진이 없습니다: {self.product_name}")
         return Path(self.photo_paths[idx - 1])
 
     @property
@@ -148,14 +189,21 @@ class Product:
         return None
 
     @property
+    def card_line(self) -> str:
+        """카드뉴스 한 줄 소개. 웹에서 확인된 설명 우선, 없으면 가격표에 적힌 상태 표기."""
+        return self.spec_line or self.condition_note
+
+    @property
     def publishable(self) -> bool:
         """카드뉴스로 만들 수 있는 상태인가."""
-        return bool(self.is_product and self.sale_price and not self.needs_review)
+        return bool(self.has_product_photo and self.sale_price and not self.needs_review)
 
     def to_dict(self) -> dict:
         data = asdict(self)
         data["computed_pct"] = self.computed_pct
         data["publishable"] = self.publishable
+        data["has_product_photo"] = self.has_product_photo
+        data["card_line"] = self.card_line
         return data
 
 
@@ -183,42 +231,77 @@ def extract_product(
         content.append(encode_image(path))
     content.append({"type": "text", "text": USER_TEMPLATE.format(n=len(photo_paths))})
 
-    response = client.messages.create(
+    response = client.messages.parse(
         model=model,
-        max_tokens=1500,
+        max_tokens=4000,
         system=SYSTEM,
-        tools=[TOOL],
-        tool_choice={"type": "tool", "name": "extract_product"},
+        output_format=ProductRead,
         messages=[{"role": "user", "content": content}],
     )
+    read: ProductRead = response.parsed_output
 
-    payload = None
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "extract_product":
-            payload = block.input
-            break
-    if payload is None:  # pragma: no cover - tool_choice 로 강제되어 있다
-        raise RuntimeError(f"비전 모델이 도구를 호출하지 않았습니다: {response}")
+    kinds = [""] * len(photo_paths)
+    for photo in read.photos:
+        if 1 <= photo.index <= len(kinds):
+            kinds[photo.index - 1] = photo.kind
 
     product = Product(
-        **{k: payload.get(k) for k in TOOL["input_schema"]["required"]},
+        product_name=read.product_name,
+        category=read.category,
+        tag_text=read.tag_text or "",
+        condition_note=read.condition_note or "",
+        original_price=read.original_price,
+        sale_price=read.sale_price,
+        discount_pct=read.discount_pct,
+        price_source=read.price_source or "",
+        best_photo_index=read.best_photo_index or 0,
+        photo_kinds=kinds,
+        review_reason=read.review_reason or "",
         photo_paths=[str(p) for p in photo_paths],
         source_file_ids=list(source_file_ids or []),
         group_index=group_index,
     )
-    return _sanity_check(product)
+    return sanity_check(product)
 
 
-def _sanity_check(p: Product) -> Product:
-    """모델이 실수했을 때 조용히 잘못된 가격이 카드에 찍히는 것을 막는다."""
-    reasons: list[str] = []
+def _unevidenced(text: str, tag_text: str) -> bool:
+    """가격표에 근거가 없는 상태 표현이 이 문장에 들어 있는가."""
+    return any(
+        pattern.search(text) and not pattern.search(tag_text) for pattern in CLAIM_PATTERNS
+    )
+
+
+def strip_unevidenced_claims(text: str, tag_text: str) -> str:
+    """가격표에 근거가 없는 상태 표현이 든 문장을 통째로 걷어낸다.
+
+    단어만 오려내면 "박스만 개봉한 품" 같은 조각이 남는다. 문장 단위로 버리는 편이 안전하다.
+    한 문장짜리 문구라면 통째로 비게 되는데, 그게 의도한 동작이다 —
+    근거 없는 상태 표현을 붙이느니 아무 말도 안 하는 게 낫다.
+    """
+    if not text:
+        return ""
+    tag = tag_text or ""
+    kept = [
+        part.strip()
+        for part in _SENTENCE_SPLIT.split(text)
+        if part.strip() and not _unevidenced(part, tag)
+    ]
+    return " ".join(kept).strip(" ,·-–—")
+
+
+def sanity_check(p: Product) -> Product:
+    """모델이 실수했을 때 잘못된 값이 조용히 카드에 찍히는 것을 막는다."""
+    reasons: list[str] = [p.review_reason] if p.review_reason else []
 
     if p.sale_price is not None and p.sale_price <= 0:
         p.sale_price = None
     if p.original_price is not None and p.original_price <= 0:
         p.original_price = None
 
-    if p.is_product and p.sale_price is None:
+    if not p.has_product_photo:
+        reasons.append("상품이 보이는 사진이 없습니다 (가격표만 있는 정보용 사진)")
+
+    if p.sale_price is None:
         reasons.append("가격표에서 판매가를 읽지 못했습니다")
 
     if p.original_price and p.sale_price and p.original_price <= p.sale_price:
@@ -236,24 +319,25 @@ def _sanity_check(p: Product) -> Product:
     if pct is not None and not (0 < pct < 95):
         reasons.append(f"할인율이 비정상입니다({pct}%)")
 
-    if "중고" in (p.one_liner or "") or "중고" in (p.product_name or ""):
-        p.one_liner = (p.one_liner or "").replace("중고", "리퍼브")
-        p.product_name = (p.product_name or "").replace("중고", "리퍼브")
+    # 가격표에 근거 없는 상태 표현은 걷어낸다
+    p.condition_note = strip_unevidenced_claims(p.condition_note, p.tag_text)
 
-    if reasons:
-        p.needs_review = True
-        p.review_reason = "; ".join(filter(None, [p.review_reason, *reasons]))
+    for attr in ("product_name", "condition_note", "spec_line", "description"):
+        value = getattr(p, attr) or ""
+        if "중고" in value:
+            setattr(p, attr, value.replace("중고", "리퍼브"))
+
+    p.needs_review = bool(reasons)
+    p.review_reason = "; ".join(dict.fromkeys(r for r in reasons if r))
     return p
+
+
+_FIELDS = {f for f in Product.__dataclass_fields__}
 
 
 def load_products(path: Path) -> list[Product]:
     data = json.loads(path.read_text(encoding="utf-8"))
-    keys = set(TOOL["input_schema"]["required"]) | {
-        "photo_paths",
-        "source_file_ids",
-        "group_index",
-    }
-    return [Product(**{k: v for k, v in item.items() if k in keys}) for item in data]
+    return [Product(**{k: v for k, v in item.items() if k in _FIELDS}) for item in data]
 
 
 def save_products(products: list[Product], path: Path) -> Path:

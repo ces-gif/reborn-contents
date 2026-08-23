@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from reborn import branding, pipeline
+from reborn import blog, branding, pipeline, ranking, research, vision
 from reborn.config import load_settings
 from reborn.drive import DriveFile
 
@@ -46,55 +46,100 @@ class FakeDrive:
         return f"file-{name or path.name}"
 
 
-def _block(name, payload):
-    return SimpleNamespace(type="tool_use", name=name, input=payload)
-
-
 class FakeAnthropic:
-    """도구 이름에 따라 미리 정해진 응답을 돌려준다."""
+    """messages.parse 를 흉내낸다. output_format 클래스 이름으로 응답을 고른다."""
 
-    def __init__(self):
+    def __init__(self, kinds_per_group=None):
         self.calls: list[str] = []
-        self.messages = SimpleNamespace(create=self._create)
+        self.kinds_per_group = kinds_per_group  # [["price_tag"], ["price_tag","product"], ...]
+        self.messages = SimpleNamespace(parse=self._parse)
 
-    def _create(self, **kwargs):
-        tool = kwargs["tool_choice"]["name"]
-        self.calls.append(tool)
-        if tool == "extract_product":
-            n = len([c for c in kwargs["messages"][0]["content"] if c["type"] == "image"])
-            idx = len([c for c in self.calls if c == "extract_product"])
-            return SimpleNamespace(content=[_block(tool, {
-                "is_product": True,
-                "product_name": f"쿠쿠 {idx}호 밥솥",
-                "one_liner": "박스만 개봉한 미사용품",
-                "category": "가전",
-                "original_price": 200000 + idx * 1000,
-                "sale_price": 100000,
-                "discount_pct": None,
-                "price_source": f"{n}번 사진 가격표",
-                "best_photo_index": 1,
-                "appeal": "혼수 수요가 많습니다",
-                "needs_review": False,
-                "review_reason": "",
-            })])
-        if tool == "pick_best":
-            return SimpleNamespace(content=[_block(tool, {
-                "ranking": [{"id": 0, "why": "할인 폭이 큽니다"}]
-            })])
-        if tool == "write_post":
-            return SimpleNamespace(content=[_block(tool, {
-                "category_tag": "오늘의 리본 특가",
-                "title": "평택 리퍼브 가전 BEST",
-                "intro": [["안녕하세요.", "리본마켓 평택점입니다."]],
-                "transition": ["그래서 오늘은 준비했어요."],
-                "items": [{"heading": "첫 번째 상품", "body": [["본문", "두 줄"]],
-                           "personal_note": "저는 이렇게 쓰곤 해요."}],
-                "table_intro": "한눈에 보시라고 정리했어요.",
-                "table_wrapup": ["표에서 보시다시피 반값입니다."],
-                "closing": [["오늘도 좋은 하루 되세요."]],
-                "tags": ["리본마켓", "평택리퍼브"],
-            })])
-        raise AssertionError(f"예상 못 한 도구: {tool}")
+    def _parse(self, **kwargs):
+        name = kwargs["output_format"].__name__
+        self.calls.append(name)
+
+        if name == "ProductRead":
+            photos = [c for c in kwargs["messages"][0]["content"] if c["type"] == "image"]
+            idx = sum(1 for c in self.calls if c == "ProductRead")
+            # 1장이면 상품+가격표가 같이 나온 사진, 2장이면 가격표 + 상품
+            if self.kinds_per_group:
+                kinds = self.kinds_per_group[idx - 1]
+            else:
+                kinds = ["both"] if len(photos) == 1 else ["price_tag", "product"]
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                content=[],
+                parsed_output=vision.ProductRead(
+                    photos=[
+                        vision.PhotoRead(index=i + 1, kind=k) for i, k in enumerate(kinds)
+                    ],
+                    product_name=f"쿠쿠 {idx}호 밥솥",
+                    tag_text="온라인가 200,000 / 리본가 100,000",
+                    condition_note="",
+                    category="가전",
+                    original_price=200000,
+                    sale_price=100000,
+                    discount_pct=None,
+                    price_source="가격표",
+                    best_photo_index=len(kinds),
+                    review_reason="",
+                ),
+            )
+
+        if name == "Research":
+            assert kwargs.get("tools"), "웹 검색 도구를 붙이지 않았습니다"
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                content=[],
+                parsed_output=research.Research(
+                    matched=True,
+                    official_name="쿠쿠 6인용 IH 압력밥솥",
+                    spec_line="6인용 IH 압력밥솥, 3중 코팅 내솥",
+                    description="6인 가구용 IH 압력밥솥입니다. 밥맛 코스가 여러 가지 들어 있습니다.",
+                    key_points=["IH 가열", "6인용"],
+                    sources=["https://example.com/a"],
+                ),
+            )
+
+        if name == "Ranking":
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                content=[],
+                parsed_output=ranking.Ranking(
+                    ranking=[ranking.RankedItem(id=0, why="할인 폭이 큽니다")]
+                ),
+            )
+
+        if name == "PostDraft":
+            n = len(self.products_for_post)
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                content=[],
+                parsed_output=blog.PostDraft(
+                    category_tag="오늘의 리본 특가",
+                    title="평택 리퍼브 가전 BEST",
+                    intro=[["안녕하세요.", "리본마켓 평택점입니다."]],
+                    transition=["그래서 오늘은 준비했어요."],
+                    items=[
+                        blog.PostItem(
+                            heading=f"{i}번째 상품",
+                            body=[["본문", "두 줄"]],
+                            personal_note="저는 이렇게 쓰곤 해요.",
+                        )
+                        for i in range(1, n + 1)
+                    ],
+                    table_intro="한눈에 보시라고 정리했어요.",
+                    table_wrapup=["표에서 보시다시피 반값입니다."],
+                    closing=[["오늘도 좋은 하루 되세요."]],
+                    tags=["리본마켓", "평택리퍼브"],
+                ),
+            )
+
+        raise AssertionError(f"예상 못 한 output_format: {name}")
+
+    @property
+    def products_for_post(self):
+        return [c for c in self.calls if c == "ProductRead"]
 
 
 @pytest.fixture
@@ -192,3 +237,62 @@ def test_second_run_skips_already_processed_photos(wired):
 def test_slugify_keeps_korean_and_strips_symbols():
     assert pipeline.slugify("삼성 비스포크 큐브 에어 (전시품)") == "삼성-비스포크-큐브-에어-전시품"
     assert pipeline.slugify("") == "상품"
+
+
+def test_price_tag_only_group_makes_no_card_but_is_reported(wired, monkeypatch):
+    """은성님 지시: 가격표만 찍힌 건 정보 전달용이라 카드뉴스를 만들지 않는다."""
+    drive, client, tmp_path = wired
+    # 1번 묶음은 가격표만, 2번 묶음은 가격표 + 상품
+    client.kinds_per_group = [["price_tag", "price_tag"], ["price_tag"]]
+
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+    result = pipeline.run(
+        settings, day=date(2026, 8, 23),
+        out_root=tmp_path / "out", work_root=tmp_path / "work",
+    )
+
+    assert result.groups == 2
+    assert result.cards == []
+    assert len(result.needs_review) == 2
+    assert all("가격표만" in p.review_reason for p in result.needs_review)
+
+    report = (tmp_path / "out" / "2026-08-23" / "_data" / "리포트.md").read_text(encoding="utf-8")
+    assert "사람이 확인해야 하는 건" in report and "가격표만" in report
+
+
+def test_web_research_line_is_used_on_the_card(wired):
+    """인터넷에서 확인된 제품 설명이 카드뉴스 한 줄로 들어간다."""
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+
+    result = pipeline.run(
+        settings, day=date(2026, 8, 23),
+        out_root=tmp_path / "out", work_root=tmp_path / "work",
+    )
+
+    assert "Research" in client.calls, "웹 검색 단계가 돌지 않았습니다"
+    for product in result.published:
+        assert product.research_matched
+        assert product.card_line == "6인용 IH 압력밥솥, 3중 코팅 내솥"
+
+
+def test_research_failure_does_not_stop_publishing(wired, monkeypatch):
+    """검색이 실패해도 카드뉴스는 그대로 나온다 (설명만 비워진다)."""
+    drive, client, tmp_path = wired
+
+    def boom(*a, **k):
+        raise RuntimeError("검색 서버 오류")
+
+    monkeypatch.setattr(research, "_collect_search_result", boom)
+
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+    result = pipeline.run(
+        settings, day=date(2026, 8, 23),
+        out_root=tmp_path / "out", work_root=tmp_path / "work",
+    )
+
+    assert len(result.cards) == 2
+    assert all(not p.research_matched and p.card_line == "" for p in result.published)

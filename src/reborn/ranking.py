@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import logging
 
+from pydantic import BaseModel, Field
+
 from .vision import Product
 
 log = logging.getLogger(__name__)
@@ -24,31 +26,13 @@ CATEGORY_WEIGHT = {
     "기타": 0.70,
 }
 
-RANK_TOOL = {
-    "name": "pick_best",
-    "description": "오늘 상품 중 가장 잘 팔릴 것 같은 순서대로 고른다.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "ranking": {
-                "type": "array",
-                "description": "잘 팔릴 것 같은 순서대로 나열한 상품 id 목록.",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer", "description": "상품 id"},
-                        "why": {
-                            "type": "string",
-                            "description": "이 순위인 이유 한 문장 (가격 대비 매력, 수요 등).",
-                        },
-                    },
-                    "required": ["id", "why"],
-                },
-            }
-        },
-        "required": ["ranking"],
-    },
-}
+class RankedItem(BaseModel):
+    id: int = Field(description="상품 id")
+    why: str = Field(description="이 순위인 이유 한 문장 (가격 대비 매력, 수요 등).")
+
+
+class Ranking(BaseModel):
+    ranking: list[RankedItem] = Field(description="잘 팔릴 것 같은 순서대로 나열한 상품 목록.")
 
 
 def rule_score(product: Product) -> float:
@@ -71,7 +55,7 @@ def pick_best(
 
     ranked = sorted(candidates, key=rule_score, reverse=True)
     if len(candidates) <= count or client is None or model is None:
-        return [(p, p.appeal or "") for p in ranked[:count]]
+        return [(p, p.spec_line or "") for p in ranked[:count]]
 
     pool = ranked[: max(count * 3, 10)]
     listing = [
@@ -79,54 +63,47 @@ def pick_best(
             "id": i,
             "상품명": p.product_name,
             "카테고리": p.category,
-            "한줄소개": p.one_liner,
+            "한줄소개": p.card_line,
+            "제품설명": p.description,
             "온라인판매가": p.original_price,
             "리본가": p.sale_price,
             "할인율": p.computed_pct,
-            "현장메모": p.appeal,
         }
         for i, p in enumerate(pool)
     ]
 
     try:
-        response = client.messages.create(
+        response = client.messages.parse(
             model=model,
-            max_tokens=1500,
+            max_tokens=4000,
             system=(
                 "당신은 리본마켓 평택점 점장입니다. 리퍼브(검수 완료 새 상품) 매장을 운영합니다.\n"
                 "오늘 매장에 들어온 상품 목록을 보고 '실제로 가장 잘 팔릴 것 같은' 순서대로 고릅니다.\n"
                 "판단 기준: 할인 폭이 체감되는가, 평택 지역 손님(신혼·이사·자취·육아)이 찾는 물건인가, "
                 "가격대가 즉시 결제 가능한 범위인가, 매장에 직접 보러 올 이유가 되는가."
             ),
-            tools=[RANK_TOOL],
-            tool_choice={"type": "tool", "name": "pick_best"},
+            output_format=Ranking,
             messages=[
                 {
                     "role": "user",
                     "content": (
                         f"오늘 상품 목록입니다.\n\n{json.dumps(listing, ensure_ascii=False, indent=2)}\n\n"
-                        f"가장 잘 팔릴 것 같은 순서대로 상위 {count}개를 pick_best 로 돌려주세요."
+                        f"가장 잘 팔릴 것 같은 순서대로 상위 {count}개를 골라주세요."
                     ),
                 }
             ],
         )
-        payload = next(
-            (b.input for b in response.content if b.type == "tool_use" and b.name == "pick_best"),
-            None,
-        )
-        if payload:
-            picked: list[tuple[Product, str]] = []
-            used: set[int] = set()
-            for item in payload.get("ranking", []):
-                idx = item.get("id")
-                if isinstance(idx, int) and 0 <= idx < len(pool) and idx not in used:
-                    used.add(idx)
-                    picked.append((pool[idx], item.get("why", "")))
-                if len(picked) == count:
-                    break
-            if picked:
-                return picked
+        picked: list[tuple[Product, str]] = []
+        used: set[int] = set()
+        for item in response.parsed_output.ranking:
+            if 0 <= item.id < len(pool) and item.id not in used:
+                used.add(item.id)
+                picked.append((pool[item.id], item.why))
+            if len(picked) == count:
+                break
+        if picked:
+            return picked
     except Exception as exc:  # 순위 매기기는 실패해도 파이프라인을 멈추지 않는다
         log.warning("모델 순위 선정 실패, 규칙 점수로 대체합니다: %s", exc)
 
-    return [(p, p.appeal or "") for p in ranked[:count]]
+    return [(p, p.spec_line or "") for p in ranked[:count]]

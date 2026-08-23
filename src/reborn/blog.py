@@ -21,90 +21,33 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from pydantic import BaseModel, Field
+
 from .vision import Product
 
 log = logging.getLogger(__name__)
 
-POST_TOOL = {
-    "name": "write_post",
-    "description": "네이버 블로그 생활정보형 포스트의 각 부분을 구조화해서 돌려준다.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "category_tag": {
-                "type": "string",
-                "description": "글 맨 위 카테고리 태그. 예: '오늘의 리본 특가'",
-            },
-            "title": {
-                "type": "string",
-                "description": "핵심 키워드가 들어간 제목. 예: '평택 리퍼브 가전 특가 8월 셋째주 BEST 5'",
-            },
-            "intro": {
-                "type": "array",
-                "description": "공감형 인트로 문단들. 각 문단은 짧은 줄의 배열(한 줄 25자 내외).",
-                "items": {"type": "array", "items": {"type": "string"}},
-            },
-            "transition": {
-                "type": "array",
-                "description": "'그래서 오늘은 ~' 전환 문단. 짧은 줄의 배열.",
-                "items": {"type": "string"},
-            },
-            "items": {
-                "type": "array",
-                "description": "BEST 상품별 섹션. 입력으로 준 순서 그대로, 개수도 그대로.",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "heading": {
-                            "type": "string",
-                            "description": "번호 없는 소제목 텍스트. 번호는 우리가 붙인다.",
-                        },
-                        "body": {
-                            "type": "array",
-                            "description": "설명 문단들. 각 문단은 짧은 줄의 배열.",
-                            "items": {"type": "array", "items": {"type": "string"}},
-                        },
-                        "personal_note": {
-                            "type": "string",
-                            "description": "'저는 ~하곤 해요' 식 1인칭 코멘트 한 줄.",
-                        },
-                    },
-                    "required": ["heading", "body", "personal_note"],
-                },
-            },
-            "table_intro": {
-                "type": "string",
-                "description": "비교표 앞에 붙일 한 줄.",
-            },
-            "table_wrapup": {
-                "type": "array",
-                "description": "표 아래에서 표 내용을 말로 다시 풀어주는 문단. 짧은 줄의 배열.",
-                "items": {"type": "string"},
-            },
-            "closing": {
-                "type": "array",
-                "description": "요약 + 따뜻한 응원 마무리 문단들.",
-                "items": {"type": "array", "items": {"type": "string"}},
-            },
-            "tags": {
-                "type": "array",
-                "description": "네이버 태그 8~12개. # 없이 단어만.",
-                "items": {"type": "string"},
-            },
-        },
-        "required": [
-            "category_tag",
-            "title",
-            "intro",
-            "transition",
-            "items",
-            "table_intro",
-            "table_wrapup",
-            "closing",
-            "tags",
-        ],
-    },
-}
+class PostItem(BaseModel):
+    heading: str = Field(description="번호 없는 소제목 텍스트. 번호는 우리가 붙인다.")
+    body: list[list[str]] = Field(
+        description="설명 문단들. 각 문단은 짧은 줄의 배열(한 줄 25자 내외)."
+    )
+    personal_note: str = Field(description="'저는 ~하곤 해요' 식 1인칭 코멘트 한 줄.")
+
+
+class PostDraft(BaseModel):
+    category_tag: str = Field(description="글 맨 위 카테고리 태그. 예: '오늘의 리본 특가'")
+    title: str = Field(description="핵심 키워드가 들어간 제목.")
+    intro: list[list[str]] = Field(description="공감형 인트로 문단들. 각 문단은 짧은 줄의 배열.")
+    transition: list[str] = Field(description="'그래서 오늘은 ~' 전환 문단. 짧은 줄의 배열.")
+    items: list[PostItem] = Field(
+        description="BEST 상품별 섹션. 입력으로 준 순서 그대로, 개수도 그대로."
+    )
+    table_intro: str = Field(description="비교표 앞에 붙일 한 줄.")
+    table_wrapup: list[str] = Field(description="표 아래에서 표 내용을 말로 다시 풀어주는 문단.")
+    closing: list[list[str]] = Field(description="요약 + 따뜻한 응원 마무리 문단들.")
+    tags: list[str] = Field(description="네이버 태그 8~12개. # 없이 단어만.")
+
 
 SYSTEM = """당신은 리본마켓 평택점 점장 최은성입니다. 네이버 블로그에 '생활정보형' 포스트를 씁니다.
 
@@ -120,6 +63,11 @@ SYSTEM = """당신은 리본마켓 평택점 점장 최은성입니다. 네이�
 - "중고"라는 단어를 절대 쓰지 않습니다. 리본마켓은 리퍼브(검수를 마친 새 상품) 매장입니다.
 - 주어진 상품 정보에 없는 스펙, 성능, 연식, 보증 조건을 지어내지 않습니다.
 - 가격은 주어진 숫자를 그대로 씁니다. 바꾸거나 반올림하지 않습니다.
+- **상품 상태를 지어내지 않습니다.** "미사용", "전시상품", "박스만 개봉", "새것 같은" 같은 표현은
+  '가격표에적힌상태' 에 실제로 적혀 있을 때만 쓸 수 있습니다. "(가격표에 상태 표기 없음)" 이면
+  상태에 대해 아무 말도 하지 않고, 제품 자체와 가격 이야기만 합니다.
+- 제품 설명은 '제품설명(웹검색확인)' 과 '특징(웹검색확인)' 에 있는 내용만 씁니다.
+  "(검색으로 확인 못 함)" 이면 제품 스펙을 언급하지 않고 상품명과 가격만으로 씁니다.
 - 통계나 수치를 지어내지 않습니다.
 - 마크다운 기호(#, **, - 등)를 본문에 쓰지 않습니다. 순수 문장으로만 씁니다.
 - items 배열은 입력으로 받은 상품 순서와 개수를 정확히 그대로 지킵니다."""
@@ -278,7 +226,10 @@ def write_post(
             "순위": i,
             "상품명": p.product_name,
             "카테고리": p.category,
-            "한줄소개": p.one_liner,
+            "한줄소개": p.card_line,
+            "가격표에적힌상태": p.condition_note or "(가격표에 상태 표기 없음)",
+            "제품설명(웹검색확인)": p.description or "(검색으로 확인 못 함)",
+            "특징(웹검색확인)": p.key_points,
             "온라인판매가": p.original_price,
             "리본마켓초특가": p.sale_price,
             "할인율": p.computed_pct,
@@ -287,44 +238,40 @@ def write_post(
         for i, (p, why) in enumerate(picks, start=1)
     ]
 
-    response = client.messages.create(
+    response = client.messages.parse(
         model=model,
-        max_tokens=8000,
+        max_tokens=16000,
         system=SYSTEM,
-        tools=[POST_TOOL],
-        tool_choice={"type": "tool", "name": "write_post"},
+        output_format=PostDraft,
         messages=[
             {
                 "role": "user",
                 "content": (
                     f"오늘은 {day.strftime('%Y년 %m월 %d일')}, {store_name} 에 아래 상품들이 들어왔습니다.\n"
-                    f"이 {len(picks)}개를 순위 그대로 소개하는 블로그 글을 write_post 로 써주세요.\n"
+                    f"이 {len(picks)}개를 순위 그대로 소개하는 블로그 글을 써주세요.\n"
                     "독자가 복사해서 바로 올릴 수 있을 만큼 완성도 있게, 각 상품마다 2~3문단씩 채워주세요.\n\n"
                     f"{json.dumps(brief, ensure_ascii=False, indent=2)}"
                 ),
             }
         ],
     )
-    payload = next(
-        (b.input for b in response.content if b.type == "tool_use" and b.name == "write_post"), None
-    )
-    if payload is None:  # pragma: no cover
-        raise RuntimeError("블로그 모델이 도구를 호출하지 않았습니다")
+    draft: PostDraft = response.parsed_output
 
-    items = payload.get("items", [])
+    items = [item.model_dump() for item in draft.items]
     if len(items) != len(products):
         log.warning("모델이 상품 %d개 중 %d개만 썼습니다. 개수를 맞춥니다.", len(products), len(items))
-        products = products[: len(items)]
+        n = min(len(items), len(products))
+        items, products = items[:n], products[:n]
 
     return BlogPost(
-        category_tag=payload["category_tag"],
-        title=payload["title"],
-        intro=payload["intro"],
-        transition=payload["transition"],
+        category_tag=draft.category_tag,
+        title=draft.title,
+        intro=draft.intro,
+        transition=draft.transition,
         items=items,
-        table_intro=payload["table_intro"],
-        table_wrapup=payload["table_wrapup"],
-        closing=payload["closing"],
-        tags=payload["tags"],
+        table_intro=draft.table_intro,
+        table_wrapup=draft.table_wrapup,
+        closing=draft.closing,
+        tags=draft.tags,
         products=products,
     )
