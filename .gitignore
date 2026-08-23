@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+out/
+work/
+.cache/
+*.egg-info/
+.pytest_cache/
+google-secrets.txt
