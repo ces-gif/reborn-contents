@@ -173,7 +173,7 @@ class Drive:
 
     def download(self, file_id: str, dest: Path) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        request = self.service.files().get_media(file_id=file_id, supportsAllDrives=True)
+        request = self.service.files().get_media(fileId=file_id, supportsAllDrives=True)
         buffer = io.BytesIO()
         downloader = MediaIoBaseDownload(buffer, request, chunksize=8 * 1024 * 1024)
         done = False
