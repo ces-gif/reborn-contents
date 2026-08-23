@@ -38,21 +38,21 @@ grouping:
   max_cards_per_day: 0
 
 model:
-  # 어느 회사 모델을 쓸지: gemini | anthropic | auto
-  #   gemini    - 구글 AI 스튜디오. 무료 등급이 있어 카드 등록 없이 쓸 수 있다. (기본)
-  #   anthropic - Claude. 유료(선불 크레딧). 가격표 판독이 조금 더 정확하다.
-  #   auto      - GEMINI_API_KEY 가 있으면 제미나이, 없으면 Claude
-  provider: "gemini"
+  # 어느 방식으로 모델을 부를지: auto | claude-cli | gemini | anthropic
+  #   claude-cli - 설치된 `claude` 명령을 부른다. **은성님 클로드 구독**으로 돌아서
+  #                API 키도 종량 결제도 필요 없다. 코워크에서 쓰시던 것과 같은 방식.
+  #   gemini     - 구글 AI 스튜디오. 무료 등급은 모델당 하루 20회라 상품 10개쯤에서 막힌다.
+  #   anthropic  - Claude API. 별도 선불 크레딧이 필요하다(구독과 별개).
+  #   auto       - 구독으로 돌 수 있으면 그걸 쓰고, 아니면 있는 키를 쓴다. (기본)
+  provider: "auto"
 
-  # 사진에서 상품명/가격을 읽는 모델
+  # 구독(claude-cli)으로 돌 때 쓸 모델
+  cli_vision: "claude-sonnet-5"
+  cli_writing: "claude-sonnet-5"
+
+  # 제미나이/Claude API 로 돌 때 쓸 모델
   vision: "gemini-3.6-flash"
-  # 웹 검색으로 제품 설명을 찾고 블로그 글을 쓰는 모델
   writing: "gemini-3.6-flash"
-
-  # Claude 로 바꾸려면:
-  #   provider: "anthropic"
-  #   vision:  "claude-opus-5"
-  #   writing: "claude-opus-5"
 
 store:
   name: "리본마켓 평택점"

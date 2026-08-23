@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -31,13 +32,29 @@ def settings(provider):
 
 # ------------------------------------------------------------ 공급자 선택
 
+def _no_cli(monkeypatch):
+    """claude 명령이 없는 환경인 척한다."""
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    monkeypatch.setattr(llm.shutil, "which", lambda name: None)
+
+
+def test_auto_prefers_the_subscription_when_claude_is_available(monkeypatch):
+    """구독으로 돌 수 있으면 그게 1순위다 — 하루 한도도 결제도 없다."""
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(llm.shutil, "which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr(llm, "ClaudeCliClient", lambda *a, **k: "cli-client")
+    assert llm.make_client(settings("auto")) == "cli-client"
+
+
 def test_auto_prefers_free_gemini_when_its_key_is_present(monkeypatch):
+    _no_cli(monkeypatch)
     monkeypatch.setenv("GEMINI_API_KEY", "x")
     monkeypatch.setattr(llm, "GeminiClient", lambda *a, **k: "gemini-client")
     assert llm.make_client(settings("auto")) == "gemini-client"
 
 
 def test_auto_falls_back_to_anthropic_when_only_that_key_is_present(monkeypatch):
+    _no_cli(monkeypatch)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
     monkeypatch.setattr(llm, "AnthropicClient", lambda *a, **k: "claude-client")
     assert llm.make_client(settings("auto")) == "claude-client"
@@ -200,3 +217,82 @@ def test_daily_quota_raises_a_quota_error_that_tells_the_user_what_to_do(monkeyp
     with pytest.raises(llm.LLMQuotaError) as caught:
         client._call(model="gemini-3.6-flash", system="s", contents=[], max_tokens=10)
     assert "결제를 켜면" in str(caught.value)
+
+
+# ------------------------------------------ 구독으로 도는 길 (claude CLI)
+
+
+class FakeRun:
+    """subprocess.run 흉내."""
+
+    def __init__(self, stdout="", returncode=0, stderr=""):
+        self.stdout, self.returncode, self.stderr = stdout, returncode, stderr
+
+
+class Tiny(BaseModel):
+    name: str
+    price: int
+
+
+def _cli(monkeypatch, **run):
+    monkeypatch.setattr(llm.shutil, "which", lambda n: "/usr/bin/claude")
+    client = llm.ClaudeCliClient(vision_model="claude-sonnet-5", writing_model="claude-sonnet-5")
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen["cmd"] = cmd
+        return FakeRun(**run)
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+    return client, seen
+
+
+def test_cli_returns_the_parsed_object(monkeypatch):
+    client, _ = _cli(
+        monkeypatch,
+        stdout=json.dumps({"result": '{"name": "게이밍 의자", "price": 43500}'}),
+    )
+    got = client.structured(system="s", parts=[llm.text_part("hi")], schema=Tiny)
+    assert (got.name, got.price) == ("게이밍 의자", 43500)
+
+
+def test_cli_passes_photos_as_paths_not_bytes(tmp_path, monkeypatch):
+    """사진을 다시 인코딩하지 않는다 — CLI 안의 Read 도구가 파일을 직접 연다."""
+    photo = tmp_path / "a.jpg"
+    photo.write_bytes(b"not really a jpeg")
+    client, seen = _cli(monkeypatch, stdout=json.dumps({"result": '{"name":"x","price":1}'}))
+    client.structured(system="s", parts=[llm.image_part(photo)], schema=Tiny)
+    prompt = seen["cmd"][2]
+    assert str(photo.resolve()) in prompt
+    assert "Read" in seen["cmd"]
+
+
+def test_cli_asks_for_web_search_only_when_wanted(monkeypatch):
+    client, seen = _cli(monkeypatch, stdout=json.dumps({"result": '{"name":"x","price":1}'}))
+    client.structured(system="s", parts=[llm.text_part("q")], schema=Tiny, search=True)
+    assert "WebSearch" in seen["cmd"]
+
+    client, seen = _cli(monkeypatch, stdout=json.dumps({"result": '{"name":"x","price":1}'}))
+    client.structured(system="s", parts=[llm.text_part("q")], schema=Tiny)
+    assert "WebSearch" not in seen["cmd"]
+
+
+def test_cli_failure_says_how_to_log_in(monkeypatch):
+    client, _ = _cli(monkeypatch, returncode=1, stderr="Invalid API key")
+    with pytest.raises(llm.LLMError) as caught:
+        client.structured(system="s", parts=[llm.text_part("q")], schema=Tiny)
+    assert "CLAUDE_CODE_OAUTH_TOKEN" in str(caught.value)
+
+
+def test_cli_reports_an_error_result(monkeypatch):
+    client, _ = _cli(
+        monkeypatch, stdout=json.dumps({"is_error": True, "result": "usage limit reached"})
+    )
+    with pytest.raises(llm.LLMError, match="usage limit"):
+        client.structured(system="s", parts=[llm.text_part("q")], schema=Tiny)
+
+
+def test_missing_claude_binary_is_explained(monkeypatch):
+    monkeypatch.setattr(llm.shutil, "which", lambda n: None)
+    with pytest.raises(llm.LLMError, match="찾을 수 없습니다"):
+        llm.ClaudeCliClient(vision_model="m", writing_model="m")

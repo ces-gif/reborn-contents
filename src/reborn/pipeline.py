@@ -165,6 +165,7 @@ def run(
     work_dir.mkdir(parents=True, exist_ok=True)
 
     client = make_llm(settings)
+    log.info("모델: 판독 %s / 글쓰기 %s", client.vision_model, client.writing_model)
 
     # 2) 폴더별로 상품 묶고 가격표 읽기 --------------------------------------
     # 사진을 먼저 전부 받아서 "가격표냐 상품이냐"를 한 장씩 판독한 뒤,
@@ -183,7 +184,7 @@ def run(
             paths_by_id[file.id] = dest
 
         photo_paths = [paths_by_id[f.id] for f in files]
-        classes = classify_photos(client, photo_paths, model=settings.vision_model)
+        classes = classify_photos(client, photo_paths, model=client.vision_model)
         kinds = [c.kind for c in classes]
         items = [c.item for c in classes]
         log.info(
@@ -218,7 +219,7 @@ def run(
                 product = extract_product(
                     client,
                     paths,
-                    model=settings.vision_model,
+                    model=client.vision_model,
                     group_index=group.index,
                     source_file_ids=[f.id for f in group.files],
                     source_name=source.name,
@@ -255,7 +256,7 @@ def run(
                 result.needs_review.append(product)
 
     # 3) 인터넷에서 제품을 찾아 짧은 설명을 붙인다 (확인 안 되면 안 붙인다) --
-    research.research_all(client, result.products, model=settings.writing_model)
+    research.research_all(client, result.products, model=client.writing_model)
 
     # 4) 카드뉴스 만들기 ------------------------------------------------------
     counters: dict[str, int] = {}
@@ -284,13 +285,13 @@ def run(
 
     # 5) BEST5 블로그 ---------------------------------------------------------
     picks = pick_best(
-        result.published, count=settings.best_count, client=client, model=settings.writing_model
+        result.published, count=settings.best_count, client=client, model=client.writing_model
     )
     if picks:
         post = write_post(
             client,
             picks,
-            model=settings.writing_model,
+            model=client.writing_model,
             store_name=settings.store_name,
             day=target_day,
             footer_note=settings.footer_note,

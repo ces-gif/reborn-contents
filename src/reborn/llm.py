@@ -1,11 +1,13 @@
-"""모델 공급자 추상화 — Gemini(무료) / Anthropic(유료) 중에 골라 쓴다.
+"""모델 공급자 추상화 — 구독(claude CLI) / Gemini / Anthropic 중에 골라 쓴다.
 
 파이프라인 나머지 코드는 이 파일의 `LLMClient.structured()` 하나만 안다.
 어느 회사 모델을 쓰는지는 설정(model.provider)에서 정한다.
 
-- gemini    : 구글 AI 스튜디오 무료 등급. 카드 등록 없이 하루 수백 건.
-              사진 판독·글쓰기·구글 검색까지 다 된다. 기본값.
-- anthropic : Claude. 유료(선불 크레딧)지만 판독 정확도가 조금 더 좋다.
+- claude-cli : 설치된 `claude` 명령을 부른다. **은성님 클로드 구독**으로 돌아서
+               API 키도 종량 결제도 필요 없다. 코워크에서 쓰시던 것과 같은 방식.
+- gemini     : 구글 AI 스튜디오. 무료 등급은 모델당 하루 20회라 상품 10개쯤에서 막힌다.
+               한도를 풀려면 API 키가 붙은 프로젝트에 결제를 켜야 한다.
+- anthropic  : Claude API. 별도 선불 크레딧이 필요하다(구독과 별개).
 
 둘 다 "스키마를 주면 그 모양의 객체를 돌려준다"는 같은 약속을 지킨다.
 """
@@ -18,6 +20,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import subprocess
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -72,6 +76,10 @@ def _encode_jpeg(path: str) -> bytes:
 
 class LLMClient(ABC):
     name: str = "?"
+    # 어느 모델을 쓸지는 공급자가 안다. 파이프라인은 여기에 물어본다 —
+    # 구독으로 돌 때와 API 로 돌 때 모델 이름이 서로 다르기 때문이다.
+    vision_model: str = ""
+    writing_model: str = ""
 
     @abstractmethod
     def structured(
@@ -364,15 +372,140 @@ def _parse_json_into(schema: type[BaseModel], raw: str) -> BaseModel:
         raise LLMError(f"모델 응답이 예상한 형식이 아닙니다: {exc}") from exc
 
 
+
+# ------------------------------------------------- Claude Code CLI (구독으로)
+
+CLI_TIMEOUT = 300
+CLI_HELP = (
+    "클로드 코드 CLI 로 로그인이 안 되어 있습니다. 깃허브 액션에서 쓰시려면 "
+    "CLAUDE_CODE_OAUTH_TOKEN 시크릿이 필요합니다 (내 컴퓨터에서 `claude setup-token` 으로 발급). "
+    "docs/SETUP.md 의 '클로드 구독으로 돌리기' 참고."
+)
+
+
+class ClaudeCliClient(LLMClient):
+    """설치된 `claude` 명령을 불러서 쓴다 — 구독으로 도는 길.
+
+    별도 API 키도, 종량 결제도 필요 없다. 은성님이 코워크에서 쓰시던 것과 같은
+    구독을 그대로 쓴다. 사진은 파일 경로로 넘기고 CLI 안의 Read 도구가 읽는다.
+    """
+
+    name = "claude-cli"
+
+    def __init__(self, *, vision_model: str, writing_model: str, binary: str = "claude"):
+        self.vision_model = vision_model
+        self.writing_model = writing_model
+        self.binary = binary
+        if shutil.which(binary) is None:
+            raise LLMError(f"`{binary}` 명령을 찾을 수 없습니다. {CLI_HELP}")
+
+    def structured(
+        self,
+        *,
+        system: str,
+        parts: Sequence[dict],
+        schema: type[BaseModel],
+        max_tokens: int = 8000,
+        search: bool = False,
+        model: str | None = None,
+    ) -> BaseModel:
+        prompt = _cli_prompt(system, parts, schema, search=search)
+        tools = ["Read", "WebSearch"] if search else ["Read"]
+        raw = self._run(prompt, model=model or self.writing_model, tools=tools)
+        return _parse_json_into(schema, raw)
+
+    def _run(self, prompt: str, *, model: str, tools: list[str]) -> str:
+        command = [
+            self.binary,
+            "-p",
+            prompt,
+            "--output-format",
+            "json",
+            "--allowedTools",
+            *tools,
+        ]
+        if model:
+            command += ["--model", model]
+        try:
+            done = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=CLI_TIMEOUT,
+                stdin=subprocess.DEVNULL,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise LLMError(f"claude CLI 가 {CLI_TIMEOUT}초 안에 답하지 않았습니다") from exc
+
+        if done.returncode != 0:
+            tail = (done.stderr or done.stdout or "").strip()[-400:]
+            raise LLMError(f"claude CLI 실패(코드 {done.returncode}): {tail}\n{CLI_HELP}")
+
+        try:
+            payload = json.loads(done.stdout)
+        except json.JSONDecodeError as exc:
+            raise LLMError(f"claude CLI 응답을 읽지 못했습니다: {done.stdout[:300]}") from exc
+
+        if payload.get("is_error"):
+            raise LLMError(f"claude CLI 오류: {payload.get('result') or payload.get('subtype')}")
+        result = payload.get("result")
+        if not result:
+            raise LLMError("claude CLI 가 빈 답을 돌려줬습니다")
+        return result
+
+
+def _cli_prompt(
+    system: str, parts: Sequence[dict], schema: type[BaseModel], *, search: bool
+) -> str:
+    """CLI 는 시스템 프롬프트·이미지 첨부가 따로 없으니 하나의 글로 합친다.
+
+    사진은 바이트 대신 **경로**로 넘긴다. CLI 안의 Read 도구가 직접 열어 본다 —
+    그래서 사진을 다시 인코딩할 필요가 없다.
+    """
+    lines = [system, "", "---", ""]
+    for part in parts:
+        if part["type"] == "text":
+            lines.append(part["text"])
+        else:
+            lines.append(f"(사진 파일: {Path(part['path']).resolve()} — Read 도구로 열어서 보세요)")
+    if search:
+        lines += ["", "WebSearch 도구로 인터넷을 찾아보고 답하세요."]
+    lines += [
+        "",
+        "---",
+        "",
+        "아래 JSON 스키마에 **정확히** 맞는 JSON 하나만 출력하세요.",
+        "설명, 인사말, 코드펜스 없이 JSON 본문만 출력합니다.",
+        "",
+        json.dumps(schema.model_json_schema(), ensure_ascii=False),
+    ]
+    return "\n".join(lines)
+
 def make_client(settings) -> LLMClient:
     """설정과 환경변수를 보고 쓸 수 있는 공급자를 고른다."""
     provider = (settings.provider or "").lower()
 
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    cli_token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
 
     if provider == "auto":
-        provider = "gemini" if gemini_key else "anthropic"
+        # 구독으로 도는 길이 있으면 그게 제일 낫다 — 한도도 결제도 없다.
+        if cli_token or shutil.which("claude"):
+            provider = "claude-cli"
+        else:
+            provider = "gemini" if gemini_key else "anthropic"
+
+    if provider in ("claude-cli", "subscription"):
+        log.info(
+            "모델 공급자: 클로드 구독(claude CLI) — %s / %s",
+            getattr(settings, "cli_vision_model", "") or settings.vision_model,
+            getattr(settings, "cli_writing_model", "") or settings.writing_model,
+        )
+        return ClaudeCliClient(
+            vision_model=getattr(settings, "cli_vision_model", "") or settings.vision_model,
+            writing_model=getattr(settings, "cli_writing_model", "") or settings.writing_model,
+        )
 
     if provider == "gemini":
         if not gemini_key:
@@ -400,4 +533,6 @@ def make_client(settings) -> LLMClient:
             writing_model=settings.writing_model,
         )
 
-    raise LLMError(f"모르는 모델 공급자입니다: {provider!r} (gemini 또는 anthropic)")
+    raise LLMError(
+        f"모르는 모델 공급자입니다: {provider!r} (claude-cli / gemini / anthropic)"
+    )

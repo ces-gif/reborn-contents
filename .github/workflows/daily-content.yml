@@ -31,6 +31,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # 스텝의 if 에서는 secrets 를 직접 못 읽는다. 여기서 한 번 걸러 둔다.
+    env:
+      USE_CLAUDE_SUBSCRIPTION: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,15 +45,29 @@ jobs:
       - name: 의존성 설치
         run: pip install -r requirements.txt
 
+      # 클로드 구독으로 돌리는 길. CLAUDE_CODE_OAUTH_TOKEN 시크릿이 있을 때만 설치한다.
+      # 이게 있으면 API 키도 종량 결제도 필요 없다 (은성님이 코워크에서 쓰시던 것과 같은 구독).
+      - name: 클로드 코드 설치 (구독으로 돌릴 때만)
+        if: env.USE_CLAUDE_SUBSCRIPTION == 'true'
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude --version
+
       - name: 콘텐츠 생성 및 발행
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
-          # 모델 공급자 — 둘 중 하나만 있어도 된다 (제미나이가 무료)
+          # 모델을 부르는 방법 — 셋 중 하나만 있으면 된다. 위에서부터 우선한다.
+          #   1. CLAUDE_CODE_OAUTH_TOKEN : 클로드 구독으로 돈다. 추가 비용 없음. (권장)
+          #      내 컴퓨터에서 `claude setup-token` 으로 발급
+          #   2. GEMINI_API_KEY          : 무료 등급은 하루 20회라 상품 10개쯤에서 막힌다
+          #   3. ANTHROPIC_API_KEY       : Claude API 선불 크레딧 (구독과 별개)
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
           KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}

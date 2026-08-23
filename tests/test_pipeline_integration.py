@@ -56,6 +56,8 @@ class FakeLLM:
         self.assigned: list[str] = []  # 1차 판독에서 실제로 내준 답 (2차 판독도 같은 답을 낸다)
         self.searched: list[str] = []
         self.name = "fake"
+        self.vision_model = "fake-vision"
+        self.writing_model = "fake-writing"
 
     def structured(self, *, system, parts, schema, max_tokens=8000, search=False, model=None):
         name = schema.__name__

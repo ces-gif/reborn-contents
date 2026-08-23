@@ -70,6 +70,8 @@ class Settings:
     provider: str
     vision_model: str
     writing_model: str
+    cli_vision_model: str
+    cli_writing_model: str
 
     store_name: str
     store_handle: str
@@ -157,6 +159,8 @@ def load_settings(path: Path | str | None = None) -> Settings:
         provider=_env("LLM_PROVIDER", model.get("provider", "auto")),
         vision_model=_env("VISION_MODEL", model.get("vision", "gemini-3.6-flash")),
         writing_model=_env("WRITING_MODEL", model.get("writing", "gemini-3.6-flash")),
+        cli_vision_model=_env("CLI_VISION_MODEL", model.get("cli_vision", "claude-sonnet-5")),
+        cli_writing_model=_env("CLI_WRITING_MODEL", model.get("cli_writing", "claude-sonnet-5")),
         store_name=_env("STORE_NAME", store.get("name", "리본마켓 평택점")),
         store_handle=_env("STORE_HANDLE", store.get("handle", "@reborn.mk")),
         footer_note=_env("FOOTER_NOTE", store.get("footer_note", "")),
