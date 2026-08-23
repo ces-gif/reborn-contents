@@ -9,9 +9,11 @@
 from __future__ import annotations
 
 import inspect
+import ssl
 
 import pytest
 
+from reborn import drive as drive_mod
 from reborn.drive import Drive
 
 # 구글 discovery 클라이언트가 실제로 받는 인자 이름 (files 리소스)
@@ -114,3 +116,63 @@ def test_every_google_call_in_drive_module_uses_camelcase():
     assert "file_id=file_id" not in source
     assert "page_token=" not in source
     assert "page_size=" not in source
+
+
+# --------------------------------------------------- 끊긴 연결에서 살아나기
+
+
+def test_reconnects_and_retries_when_the_connection_drops(monkeypatch):
+    """판독에 십수 분 걸리는 동안 구글 연결이 끊긴다.
+
+    실제로 카드뉴스 11장을 다 만들어 놓고 마지막 업로드에서 SSLEOFError 로
+    전부 날렸다. 끊긴 연결은 버리고 새로 붙어서 다시 해야 한다.
+    """
+    monkeypatch.setattr(drive_mod.time, "sleep", lambda s: None)
+    client = drive_mod.Drive.__new__(drive_mod.Drive)
+    client._owns_service = True
+    client.service = "old"
+    monkeypatch.setattr(drive_mod.Drive, "_build_service", staticmethod(lambda: "new"))
+
+    calls = []
+
+    def flaky():
+        calls.append(client.service)
+        if len(calls) < 3:
+            raise ssl.SSLEOFError("EOF occurred in violation of protocol")
+        return "ok"
+
+    assert client._retry(flaky) == "ok"
+    assert calls == ["old", "new", "new"]  # 끊길 때마다 새로 붙었다
+
+
+def test_gives_up_after_the_last_attempt(monkeypatch):
+    monkeypatch.setattr(drive_mod.time, "sleep", lambda s: None)
+    client = drive_mod.Drive.__new__(drive_mod.Drive)
+    client._owns_service = True
+    client.service = "s"
+    monkeypatch.setattr(drive_mod.Drive, "_build_service", staticmethod(lambda: "s"))
+
+    def always_broken():
+        raise ConnectionResetError("nope")
+
+    with pytest.raises(ConnectionResetError):
+        client._retry(always_broken, attempts=3)
+
+
+def test_injected_service_is_never_rebuilt(monkeypatch):
+    """테스트가 넣어준 가짜 서비스를 우리가 갈아치우면 안 된다."""
+    monkeypatch.setattr(drive_mod.time, "sleep", lambda s: None)
+    client = drive_mod.Drive.__new__(drive_mod.Drive)
+    client._owns_service = False
+    client.service = "fake"
+
+    calls = []
+
+    def flaky():
+        calls.append(client.service)
+        if len(calls) < 2:
+            raise ssl.SSLEOFError("boom")
+        return "ok"
+
+    assert client._retry(flaky) == "ok"
+    assert calls == ["fake", "fake"]

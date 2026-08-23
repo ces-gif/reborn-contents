@@ -22,7 +22,10 @@ import binascii
 import io
 import json
 import logging
+import http.client
 import os
+import socket
+import ssl
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -37,6 +40,16 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 log = logging.getLogger(__name__)
+
+# 연결이 끊긴 것뿐인 오류들. 새로 붙어서 다시 하면 된다.
+TRANSPORT_ERRORS = (
+    ssl.SSLError,
+    socket.timeout,
+    http.client.HTTPException,
+    ConnectionError,
+    TimeoutError,
+    BrokenPipeError,
+)
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -125,9 +138,24 @@ def build_credentials():
 
 class Drive:
     def __init__(self, service=None):
-        self.service = service or build(
-            "drive", "v3", credentials=build_credentials(), cache_discovery=False
-        )
+        # 테스트가 넣어준 가짜 서비스는 우리가 다시 만들면 안 된다.
+        self._owns_service = service is None
+        self.service = service or self._build_service()
+
+    @staticmethod
+    def _build_service():
+        return build("drive", "v3", credentials=build_credentials(), cache_discovery=False)
+
+    def _reconnect(self) -> None:
+        """끊긴 연결을 버리고 새로 붙는다.
+
+        사진 판독에 십수 분이 걸리는 동안 구글 쪽 연결이 놀다가 끊긴다.
+        그 상태로 업로드를 시작하면 SSLEOFError 로 죽는다 (실제로 그랬다 —
+        카드뉴스 11장을 다 만들어 놓고 마지막 업로드에서 전부 날렸다).
+        """
+        if not self._owns_service:
+            return
+        self.service = self._build_service()
 
     # ------------------------------------------------------------------ read
 
@@ -173,13 +201,17 @@ class Drive:
 
     def download(self, file_id: str, dest: Path) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        request = self.service.files().get_media(fileId=file_id, supportsAllDrives=True)
-        buffer = io.BytesIO()
-        downloader = MediaIoBaseDownload(buffer, request, chunksize=8 * 1024 * 1024)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-        dest.write_bytes(buffer.getvalue())
+
+        def fetch() -> bytes:
+            request = self.service.files().get_media(fileId=file_id, supportsAllDrives=True)
+            buffer = io.BytesIO()
+            downloader = MediaIoBaseDownload(buffer, request, chunksize=8 * 1024 * 1024)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            return buffer.getvalue()
+
+        dest.write_bytes(self._retry(fetch))
         return dest
 
     def find_child(self, parent_id: str, name: str, *, mime_type: str | None = None) -> str | None:
@@ -256,8 +288,7 @@ class Drive:
 
     # ----------------------------------------------------------------- utils
 
-    @staticmethod
-    def _retry(call, *, attempts: int = 5):
+    def _retry(self, call, *, attempts: int = 5):
         delay = 2.0
         last: Exception | None = None
         for attempt in range(attempts):
@@ -269,8 +300,20 @@ class Drive:
                     raise
                 last = exc
                 log.warning("드라이브 API %s, %.0f초 후 재시도 (%d/%d)", status, delay, attempt + 1, attempts)
-                time.sleep(delay)
-                delay *= 2
+            except TRANSPORT_ERRORS as exc:  # 연결이 끊겼다 — 새로 붙어서 다시 한다
+                if attempt == attempts - 1:
+                    raise
+                last = exc
+                log.warning(
+                    "드라이브 연결이 끊겼습니다(%s), 다시 붙어서 %.0f초 후 재시도 (%d/%d)",
+                    type(exc).__name__,
+                    delay,
+                    attempt + 1,
+                    attempts,
+                )
+                self._reconnect()
+            time.sleep(delay)
+            delay *= 2
         raise last  # pragma: no cover
 
 
