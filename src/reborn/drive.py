@@ -53,6 +53,8 @@ TRANSPORT_ERRORS = (
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 FOLDER_MIME = "application/vnd.google-apps.folder"
+# 원장은 발행 폴더에 따로 사는 파일이라 정리 대상이 아니다.
+PROTECTED_NAMES = {"_ledger.json"}
 IMAGE_MIMES = ("image/jpeg", "image/png", "image/heic", "image/heif", "image/webp")
 
 
@@ -286,6 +288,14 @@ class Drive:
             )
         return file["id"]
 
+    def trash(self, file_id: str) -> None:
+        """파일을 휴지통으로 보낸다. 영구 삭제가 아니라 되돌릴 수 있다."""
+        self._retry(
+            lambda: self.service.files()
+            .update(fileId=file_id, body={"trashed": True}, supportsAllDrives=True)
+            .execute()
+        )
+
     # ----------------------------------------------------------------- utils
 
     def _retry(self, call, *, attempts: int = 5):
@@ -331,17 +341,43 @@ def _guess_mime(path: Path) -> str:
     }.get(suffix, "application/octet-stream")
 
 
-def upload_tree(drive: Drive, local_dir: Path, parent_id: str) -> dict[str, str]:
-    """local_dir 안의 파일/폴더를 드라이브에 그대로 올린다. {상대경로: fileId}"""
+def upload_tree(drive: Drive, local_dir: Path, parent_id: str, *, mirror: bool = True) -> dict[str, str]:
+    """local_dir 안의 파일/폴더를 드라이브에 그대로 올린다. {상대경로: fileId}
+
+    mirror=True 면 **로컬에 없는 파일은 드라이브에서 치운다.**
+    같은 날짜를 다시 돌리면 상품 순서가 바뀌어 파일 이름도 바뀐다. 치우지 않으면
+    예전 실행의 03번과 새 실행의 03번이 한 폴더에 나란히 남아, 직원이 어느 게
+    오늘 것인지 알 수 없게 된다 (실제로 그렇게 됐다).
+    """
     uploaded: dict[str, str] = {}
     for entry in sorted(local_dir.iterdir()):
         if entry.is_dir():
             child = drive.ensure_folder(entry.name, parent_id)
-            for rel, fid in upload_tree(drive, entry, child).items():
+            for rel, fid in upload_tree(drive, entry, child, mirror=mirror).items():
                 uploaded[f"{entry.name}/{rel}"] = fid
         else:
             uploaded[entry.name] = drive.upload(entry, parent_id)
+
+    if mirror:
+        _trash_extras(drive, parent_id, {e.name for e in local_dir.iterdir()})
     return uploaded
+
+
+def _trash_extras(drive: Drive, parent_id: str, keep: set[str]) -> None:
+    """이번에 만들지 않은 파일을 휴지통으로 보낸다 (폴더는 건드리지 않는다)."""
+    try:
+        existing = drive.list_children(parent_id)
+    except Exception as exc:  # 정리에 실패했다고 발행을 멈추지는 않는다
+        log.warning("예전 파일 정리를 건너뜁니다(%s): %s", parent_id, exc)
+        return
+    for item in existing:
+        if item.mime_type == FOLDER_MIME or item.name in keep or item.name in PROTECTED_NAMES:
+            continue
+        try:
+            drive.trash(item.id)
+            log.info("예전 실행 파일 정리: %s", item.name)
+        except Exception as exc:
+            log.warning("'%s' 를 치우지 못했습니다: %s", item.name, exc)
 
 
 def iter_images(files: Iterable[DriveFile]) -> list[DriveFile]:
