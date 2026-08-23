@@ -1,60 +1,48 @@
 @echo off
-setlocal
-chcp 65001 >nul
-REM ============================================================
-REM  리본마켓 콘텐츠 자동화 - 구글 드라이브 연결 (윈도우용)
-REM  이 파일을 더블클릭하면 설치 마법사가 실행됩니다.
-REM ============================================================
+rem ---------------------------------------------------------------
+rem  Reborn Market content automation - setup launcher (Windows)
+rem  NOTE: keep this file ASCII-only. cmd.exe mangles non-ASCII
+rem        batch files and tries to run the garbled text as commands.
+rem        All Korean guidance lives in scripts/setup_google.py.
+rem ---------------------------------------------------------------
 cd /d "%~dp0"
 
-echo.
-echo   ============================================
-echo    리본마켓 콘텐츠 자동화 - 설치 마법사
-echo   ============================================
-echo.
-
-REM --- 파이썬 찾기: py 런처 먼저, 없으면 python ---
 set "PY="
-py -3 --version >nul 2>&1 && set "PY=py -3"
-if not defined PY (
-  python --version >nul 2>&1 && set "PY=python"
-)
+py -3 -c "import sys" >nul 2>&1
+if %errorlevel%==0 set "PY=py -3"
+if defined PY goto haspy
 
-REM 윈도우 스토어 껍데기(python.exe 스텁)를 걸러낸다
-if defined PY (
-  %PY% -c "import sys" >nul 2>&1 || set "PY="
-)
+python -c "import sys" >nul 2>&1
+if %errorlevel%==0 set "PY=python"
+if defined PY goto haspy
 
-if not defined PY (
-  echo   [!] 파이썬이 설치되어 있지 않습니다.
-  echo.
-  echo   1) 브라우저가 열리면 노란색 [Download Python] 버튼을 누르세요.
-  echo   2) 설치 창 맨 아래 [Add python.exe to PATH] 를 반드시 체크하세요.
-  echo   3) 설치가 끝나면 이 setup.bat 을 다시 더블클릭하세요.
-  echo.
-  start "" "https://www.python.org/downloads/"
-  pause
-  exit /b 1
-)
+echo.
+echo   Python is not installed.
+echo   1. A download page will open. Click the yellow Download button.
+echo   2. In the installer, CHECK "Add python.exe to PATH" at the bottom.
+echo   3. Run this setup.bat again.
+echo.
+start "" "https://www.python.org/downloads/"
+pause
+exit /b 1
 
-echo   파이썬 확인:
+:haspy
+echo.
+echo   Reborn Market - setup
+echo.
 %PY% --version
 echo.
-echo   필요한 패키지를 설치합니다. 처음 한 번만 1~2분 걸립니다...
-echo.
-
-%PY% -m pip install --quiet --disable-pip-version-check --upgrade pip
+echo   Installing packages (1-2 minutes on first run)...
 %PY% -m pip install --quiet --disable-pip-version-check -r requirements.txt
-if errorlevel 1 (
-  echo.
-  echo   [!] 패키지 설치에 실패했습니다.
-  echo       인터넷 연결을 확인하고 다시 시도해 주세요.
-  pause
-  exit /b 1
-)
+if not %errorlevel%==0 goto pipfail
 
-echo   준비 완료. 마법사를 시작합니다.
-echo.
 %PY% scripts\setup_google.py
 echo.
 pause
+exit /b 0
+
+:pipfail
+echo.
+echo   Package install failed. Check your internet connection and retry.
+pause
+exit /b 1

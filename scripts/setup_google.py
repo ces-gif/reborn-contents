@@ -30,6 +30,24 @@ DRIVE_API_URL = "https://console.cloud.google.com/apis/library/drive.googleapis.
 OUT_FILE = Path("google-secrets.txt")
 
 
+def _init_console() -> None:
+    """윈도우 콘솔에서 한글이 깨지지 않게 한다."""
+    if sys.platform != "win32":
+        return
+    try:  # 파이썬 3.7+ 는 콘솔에 UTF-8 로 쓸 수 있다
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    try:
+        import ctypes
+
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass
+
+
 def say(text: str = "") -> None:
     print(text, flush=True)
 
@@ -222,6 +240,7 @@ def finish(client_id: str, client_secret: str, refresh_token: str) -> None:
 
 
 def main() -> int:
+    _init_console()
     rule("리본마켓 · 구글 드라이브 연결 설치 마법사")
     say("서비스 계정 키를 못 만드는 조직에서 쓰는 방법(내 계정 OAuth)으로 연결합니다.")
     say("총 4단계, 5분쯤 걸립니다.")
