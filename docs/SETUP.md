@@ -35,15 +35,62 @@
 > **서비스 계정에는 저장 용량이 없습니다.** 위 5~6번처럼 *은성님 폴더에 편집자로 초대*해야
 > 그 폴더 안에 파일을 만들 수 있습니다. 폴더 공유를 빼먹으면 업로드가 실패합니다.
 
-<details>
-<summary>서비스 계정 대신 내 계정(OAuth)으로 하고 싶다면</summary>
+### ⚠️ "서비스 계정 키 생성 사용 중지됨" 이 뜨면
 
-`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REFRESH_TOKEN`
-세 개를 넣으면 그 계정 권한으로 동작합니다. 리프레시 토큰은
-[OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)에서
-`https://www.googleapis.com/auth/drive` 범위로 발급받을 수 있습니다.
-(서비스 계정이 있으면 그쪽이 우선 사용됩니다.)
-</details>
+조직 정책 `iam.disableServiceAccountKeyCreation` 이 켜져 있는 겁니다.
+구글이 새로 만든 조직에 **기본으로** 켜두기 때문에 흔히 만납니다. 세 갈래 중 하나를 고르세요.
+
+**갈래 A — 조직 정책 끄기 (2분, 조직 관리자면 이게 제일 빠름)**
+
+1. 클라우드 콘솔 상단 프로젝트 선택기 → **조직**(예: `rebornmarket.org`) 선택
+2. **IAM 및 관리자 → IAM** → 본인 계정에 역할 **`조직 정책 관리자`** 추가
+   (Workspace 최고관리자여도 GCP 역할은 따로 받아야 합니다)
+3. **IAM 및 관리자 → 조직 정책** → 필터에 `disableServiceAccountKeyCreation`
+4. **서비스 계정 키 생성 사용 중지** → **정책 관리** → **재정의** → 규칙 **적용 안 함(Off)** → 저장
+5. 다시 서비스 계정 → 키 → 키 추가 → JSON
+
+조직 전체를 열기 부담스러우면, 프로젝트를 선택한 상태에서 같은 정책을 열고
+"상위 정책 재정의 → 적용 안 함" 으로 **이 프로젝트만** 예외 처리해도 됩니다.
+
+**갈래 B — 내 계정 OAuth 로 우회 (콘솔 정책을 안 건드림)**
+
+서비스 계정 키 없이, 은성님 계정 권한으로 드라이브를 씁니다.
+
+1. **API 및 서비스 → OAuth 동의 화면** → User Type **`내부(Internal)`** 선택
+   > ⚠️ 반드시 **내부**로 하세요. 외부/테스트 모드면 **리프레시 토큰이 7일 만에 만료**됩니다.
+2. **사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID**
+   - 애플리케이션 유형: **데스크톱 앱**
+   - 클라이언트 ID / 보안 비밀번호 복사
+3. 내 컴퓨터에서 한 번만 실행 (VS Code 터미널):
+   ```bash
+   pip install -r requirements.txt
+   set GOOGLE_OAUTH_CLIENT_ID=클라이언트ID
+   set GOOGLE_OAUTH_CLIENT_SECRET=보안비밀번호
+   python scripts/make_refresh_token.py
+   ```
+   브라우저가 열리고 로그인하면 리프레시 토큰이 화면에 찍힙니다.
+4. 깃허브 시크릿에 **3개**를 넣습니다:
+   `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`
+5. 이 방식은 은성님 계정으로 도는 것이라 **폴더 공유가 필요 없습니다.**
+
+**갈래 C — 키 없는 인증 (구글 권장, 설정은 제일 김)**
+
+깃허브 액션이 OIDC 로 구글에 직접 인증합니다. 키 파일이 아예 없어서 유출 위험이 없고
+위 조직 정책과도 충돌하지 않습니다. 워크플로에 아래 단계를 추가하면 됩니다:
+
+```yaml
+- uses: google-github-actions/auth@v2
+  with:
+    workload_identity_provider: projects/<번호>/locations/global/workloadIdentityPools/<풀>/providers/<제공자>
+    service_account: reborn@<프로젝트>.iam.gserviceaccount.com
+```
+
+콘솔에서 **IAM 및 관리자 → Workload Identity 제휴** 로 풀과 제공자를 만들고,
+서비스 계정에 `roles/iam.workloadIdentityUser` 를 부여해야 합니다.
+코드는 이미 이 방식을 지원합니다(자격증명이 없으면 자동으로 ADC 를 씁니다).
+
+> **어느 걸 고를까**: 조직 관리자 권한이 있으면 **A**, 없거나 정책을 건드리기 싫으면 **B**,
+> 장기적으로 가장 안전하게 가고 싶으면 **C**.
 
 ## 2. Anthropic API 키 만들기
 

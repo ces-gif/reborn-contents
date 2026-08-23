@@ -1,12 +1,18 @@
 """Google Drive 읽기/쓰기.
 
-인증은 두 가지를 지원한다 (환경변수로만 받는다, 저장소에 키를 두지 않는다):
+인증은 세 가지를 지원한다 (환경변수로만 받는다, 저장소에 키를 두지 않는다).
+앞에 있는 것부터 먼저 쓴다:
 
-1. 서비스 계정 - GOOGLE_SERVICE_ACCOUNT_JSON (JSON 원문 또는 base64)
-   → 사람이 로그인할 필요가 없어서 매일 자동 실행에 가장 적합. 권장.
+1. 서비스 계정 키 - GOOGLE_SERVICE_ACCOUNT_JSON (JSON 원문 또는 base64)
+   → 가장 간단하지만, 조직 정책 iam.disableServiceAccountKeyCreation 이 켜져 있으면
+     키를 아예 만들 수 없다. 그럴 땐 2번이나 3번을 쓴다.
 2. 사용자 OAuth - GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET /
    GOOGLE_OAUTH_REFRESH_TOKEN
-   → 개인 드라이브 용량으로 업로드해야 할 때 사용.
+   → 은성님 계정 권한으로 동작한다. 서비스 계정 키를 못 만들 때 가장 빠른 우회로.
+3. 키 없는 인증 (Workload Identity Federation / ADC)
+   → 깃허브 액션에서 google-github-actions/auth 로 OIDC 인증을 하면
+     GOOGLE_APPLICATION_CREDENTIALS 가 자동으로 잡힌다. 키 파일이 아예 없어서
+     구글이 권장하는 방식이고, 위 조직 정책과도 충돌하지 않는다.
 """
 
 from __future__ import annotations
@@ -98,9 +104,22 @@ def build_credentials():
         creds.refresh(Request())
         return creds
 
+    # 3) 키 없는 인증 — 깃허브 액션의 OIDC(Workload Identity Federation) 등
+    #    google-github-actions/auth 가 잡아준 자격증명을 그대로 쓴다.
+    try:
+        import google.auth
+
+        creds, _ = google.auth.default(scopes=SCOPES)
+        log.info("키 없는 기본 자격증명(ADC)으로 드라이브에 연결합니다")
+        return creds
+    except Exception as exc:
+        log.debug("기본 자격증명 없음: %s", exc)
+
     raise DriveAuthError(
-        "구글 드라이브 인증 정보가 없습니다. GOOGLE_SERVICE_ACCOUNT_JSON 또는 "
-        "GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN 을 설정하세요. (docs/SETUP.md 참고)"
+        "구글 드라이브 인증 정보가 없습니다. 아래 중 하나를 설정하세요 (docs/SETUP.md 참고):\n"
+        "  1) GOOGLE_SERVICE_ACCOUNT_JSON — 서비스 계정 키 JSON\n"
+        "  2) GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REFRESH_TOKEN\n"
+        "  3) 깃허브 액션에서 google-github-actions/auth 로 키 없는 OIDC 인증"
     )
 
 
