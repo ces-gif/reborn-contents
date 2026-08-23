@@ -28,6 +28,11 @@ CONTENT_W = W - MARGIN * 2
 Y_ACCENT_BAR = 14
 Y_LOGO = 176
 LOGO_H = 78
+# 로고는 높이가 아니라 **넓이**로 맞춘다. 모양(가로로 긴 워드마크 / 정사각형
+# 마스코트)이 달라도 눈에 보이는 크기가 비슷해야 한다.
+LOGO_AREA = 312 * LOGO_H
+LOGO_MAX_W = 360
+LOGO_MAX_H = 170
 Y_NAME_BOTTOM = 592  # 상품명 블록의 아랫변(1줄이든 2줄이든 소개 문구 위치가 흔들리지 않게)
 Y_DESC = 614
 Y_PHOTO = 700
@@ -101,9 +106,11 @@ def _logo_image(logo, strict_logo: bool) -> Image.Image:
     """카드 좌상단에 얹을 로고 이미지."""
     if isinstance(logo, Image.Image):  # 글자 로고(신규 매장) 등 이미 만들어진 것
         img = logo
-        ratio = LOGO_H / img.height
-        return img.resize((max(1, round(img.width * ratio)), LOGO_H), Image.LANCZOS)
-    return B.load_logo(LOGO_H, strict=strict_logo, path=logo)
+    else:
+        img = B.trim_margins(Image.open(logo)) if logo else B.trim_margins(
+            Image.open(B.logo_path(strict=strict_logo))
+        )
+    return B.fit_logo(img, area=LOGO_AREA, max_w=LOGO_MAX_W, max_h=LOGO_MAX_H)
 
 
 def render_card(
@@ -124,6 +131,7 @@ def render_card(
     # 2) 로고. 로고가 없으면 여기서 예외 → 있는 매장의 로고를 멋대로 글자로 대체하지 않는다.
     mark = _logo_image(logo, strict_logo)
     canvas.paste(mark, (MARGIN, Y_LOGO), mark)
+    logo_mid = Y_LOGO + mark.height // 2
 
     # 3) 날짜 뱃지 (우상단)
     if data.date_label:
@@ -134,7 +142,7 @@ def render_card(
         th = ascent + descent
         x1 = W - MARGIN
         x0 = x1 - (tw + pad_x * 2)
-        cy = Y_LOGO + LOGO_H // 2
+        cy = logo_mid
         y0, y1 = cy - (th + pad_y * 2) // 2, cy + (th + pad_y * 2) // 2
         draw.rounded_rectangle([x0, y0, x1, y1], radius=(y1 - y0) // 2, fill=(244, 245, 248))
         draw.text((x0 + pad_x, y0 + pad_y), data.date_label, font=fnt, fill=B.SLATE)

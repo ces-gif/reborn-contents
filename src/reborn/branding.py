@@ -80,6 +80,13 @@ def logo_path(strict: bool = True) -> Path:
     raise LogoMissing("로고 없음")
 
 
+# 발광·그림자처럼 아주 옅은 픽셀은 여백으로 본다.
+# 여우마켓 로고가 그랬다: 그림 자체는 가운데 603x657 인데 옅은 발광이 1536x1024
+# 전체에 깔려 있어, 알파가 0보다 크기만 하면 자르는 방식으로는 한 픽셀도 못 잘라냈다.
+# 그 결과 카드에 로고가 콩알만 하게 박혔다.
+FAINT_ALPHA = 20
+
+
 def trim_margins(img: Image.Image, *, tolerance: int = 12) -> Image.Image:
     """로고 주변 여백을 잘라낸다.
 
@@ -90,7 +97,8 @@ def trim_margins(img: Image.Image, *, tolerance: int = 12) -> Image.Image:
     alpha = img.getchannel("A")
 
     if alpha.getextrema()[0] < 250:  # 투명한 부분이 있다 → 알파 기준
-        bbox = alpha.getbbox()
+        solid = alpha.point(lambda v: 255 if v > FAINT_ALPHA else 0)
+        bbox = solid.getbbox() or alpha.getbbox()
         return img.crop(bbox) if bbox else img
 
     rgb = img.convert("RGB")
@@ -120,6 +128,20 @@ def wordmark(text: str, height: int) -> Image.Image:
     img = Image.new("RGBA", (width + 8, ascent + descent), (0, 0, 0, 0))
     ImageDraw.Draw(img).text((4, 0), text, font=fnt, fill=(*SLATE, 255))
     return img
+
+
+def fit_logo(img: Image.Image, *, area: int, max_w: int, max_h: int) -> Image.Image:
+    """로고를 '눈에 보이는 크기'가 비슷하도록 맞춘다.
+
+    높이만 맞추면 모양에 따라 크기가 들쭉날쭉해진다. 리본마켓 로고는 가로로 긴
+    워드마크라 높이 78 이 적당하지만, 여우마켓 로고는 마스코트와 글자가 세로로
+    쌓인 정사각형에 가까워서 같은 높이로 맞추면 콩알만 해진다.
+    그래서 **넓이**를 기준으로 맞추고, 상자를 넘지 않게만 눌러 준다.
+    """
+    w, h = img.size
+    scale = (area / (w * h)) ** 0.5
+    scale = min(scale, max_w / w, max_h / h)
+    return img.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS)
 
 
 def load_logo(

@@ -127,8 +127,8 @@ stores:
       # 그날 실행부터 자동으로 카드뉴스에 들어간다 (파일 ID 를 따로 적을 필요 없다).
       logo_file_id: ""
       logo_folder_id: "1oSGcj68OFfDTbtPQkbeuVMEJyolPorib"
-      # 로고 PNG 가 올라오기 전까지는 매장 이름을 글자로 넣는다 (그래야 첫날부터 카드가 나온다).
-      # 로고 폴더에 PNG 를 올리면 그날부터 자동으로 진짜 로고로 바뀐다.
+      # 로고 폴더에 PNG 가 올라오면 그 최신 파일을 자동으로 쓴다 (2026-08-23 올라옴).
+      # 혹시 폴더가 비면 매장 이름을 글자로라도 넣어 카드가 끊기지 않게 한다.
       logo_wordmark: true
     store:
       id: "fox-ils"
