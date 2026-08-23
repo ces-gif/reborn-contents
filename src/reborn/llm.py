@@ -414,6 +414,19 @@ class ClaudeCliClient(LLMClient):
         raw = self._run(prompt, model=model or self.writing_model, tools=tools)
         return _parse_json_into(schema, raw)
 
+    def _child_env(self) -> dict[str, str]:
+        """구독 토큰이 API 키에 밀리지 않게 환경을 정리한다.
+
+        ANTHROPIC_API_KEY 가 환경에 있으면 claude CLI 는 그걸 먼저 쓴다.
+        그 키에 크레딧이 없으면 구독 토큰이 멀쩡해도 전부
+        "Credit balance is too low" 로 실패한다 (실제로 그렇게 됐다).
+        구독으로 돌기로 한 이상 API 키 쪽 설정은 자식 프로세스에서 걷어낸다.
+        """
+        env = dict(os.environ)
+        for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"):
+            env.pop(name, None)
+        return env
+
     def _run(self, prompt: str, *, model: str, tools: list[str]) -> str:
         command = [
             self.binary,
@@ -433,6 +446,7 @@ class ClaudeCliClient(LLMClient):
                 text=True,
                 timeout=CLI_TIMEOUT,
                 stdin=subprocess.DEVNULL,
+                env=self._child_env(),
             )
         except subprocess.TimeoutExpired as exc:
             raise LLMError(f"claude CLI 가 {CLI_TIMEOUT}초 안에 답하지 않았습니다") from exc
@@ -446,8 +460,15 @@ class ClaudeCliClient(LLMClient):
         except json.JSONDecodeError as exc:
             raise LLMError(f"claude CLI 응답을 읽지 못했습니다: {done.stdout[:300]}") from exc
 
-        if payload.get("is_error"):
-            raise LLMError(f"claude CLI 오류: {payload.get('result') or payload.get('subtype')}")
+        message = str(payload.get("result") or "")
+        if payload.get("is_error") or payload.get("api_error_status"):
+            if "redit balance" in message:
+                raise LLMError(
+                    "클로드 API 키(선불 크레딧)로 붙어서 실패했습니다. 구독으로 돌리려면 "
+                    "ANTHROPIC_API_KEY 없이 CLAUDE_CODE_OAUTH_TOKEN 만 있어야 합니다. "
+                    f"(원문: {message})"
+                )
+            raise LLMError(f"claude CLI 오류: {message or payload.get('subtype')}")
         result = payload.get("result")
         if not result:
             raise LLMError("claude CLI 가 빈 답을 돌려줬습니다")

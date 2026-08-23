@@ -296,3 +296,36 @@ def test_missing_claude_binary_is_explained(monkeypatch):
     monkeypatch.setattr(llm.shutil, "which", lambda n: None)
     with pytest.raises(llm.LLMError, match="찾을 수 없습니다"):
         llm.ClaudeCliClient(vision_model="m", writing_model="m")
+
+
+def test_cli_hides_the_api_key_from_the_child_process(monkeypatch):
+    """구독으로 돌기로 했으면 API 키가 끼어들면 안 된다.
+
+    claude CLI 는 ANTHROPIC_API_KEY 를 먼저 쓴다. 그 키에 크레딧이 없으면
+    구독 토큰이 멀쩡해도 전부 "Credit balance is too low" 로 실패한다.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-dead")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat-alive")
+    monkeypatch.setattr(llm.shutil, "which", lambda n: "/usr/bin/claude")
+    client = llm.ClaudeCliClient(vision_model="m", writing_model="m")
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen["env"] = kwargs["env"]
+        return FakeRun(stdout=json.dumps({"result": '{"name":"x","price":1}'}))
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+    client.structured(system="s", parts=[llm.text_part("q")], schema=Tiny)
+
+    assert "ANTHROPIC_API_KEY" not in seen["env"]
+    assert seen["env"]["CLAUDE_CODE_OAUTH_TOKEN"] == "sk-ant-oat-alive"
+
+
+def test_credit_error_explains_the_api_key_clash(monkeypatch):
+    client, _ = _cli(
+        monkeypatch,
+        stdout=json.dumps({"api_error_status": 400, "result": "Credit balance is too low"}),
+    )
+    with pytest.raises(llm.LLMError) as caught:
+        client.structured(system="s", parts=[llm.text_part("q")], schema=Tiny)
+    assert "ANTHROPIC_API_KEY" in str(caught.value)
