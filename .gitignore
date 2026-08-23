@@ -9,3 +9,4 @@ work/
 *.egg-info/
 .pytest_cache/
 google-secrets.txt
+setup-log.txt
