@@ -102,8 +102,11 @@ def run(
     )
     log.info("소스 폴더 사진 %d장 중 %s 업로드분 %d장", len(files), target_day, len(todays))
 
-    publish_root = _ensure_publish_root(drive, settings)
-    ledger = _load_ledger(drive, publish_root, work_root)
+    # dry-run 일 때는 드라이브에 아무것도 만들지 않는다 (폴더 생성도 쓰기다).
+    publish_root = _find_publish_root(drive, settings) if dry_run else _ensure_publish_root(
+        drive, settings
+    )
+    ledger = _load_ledger(drive, publish_root, work_root) if publish_root else Ledger()
 
     if not reprocess:
         before = len(todays)
@@ -272,6 +275,13 @@ def run(
         result.notified = notify.broadcast(kakao_text, result.drive_folder_url)
 
     return result
+
+
+def _find_publish_root(drive: Drive, settings: Settings) -> str | None:
+    parent = settings.publish_parent_id or drive.get_parent(settings.source_folder_id)
+    if not parent:
+        return None
+    return drive.find_child(parent, settings.publish_folder_name)
 
 
 def _ensure_publish_root(drive: Drive, settings: Settings) -> str:
