@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from reborn.drive import DriveFile
-from reborn.grouping import capture_time, filter_for_day, group_photos
+from reborn.grouping import capture_time, filter_for_day, group_by_content, group_photos
 
 
 def f(name, created="2026-08-21T09:07:22Z"):
@@ -39,3 +39,77 @@ def test_filter_for_day_uses_upload_time_in_kst():
     day = datetime(2026, 8, 23, tzinfo=timezone.utc)
     kept = filter_for_day(files, day)
     assert [x.name for x in kept] == ["b.jpg"]
+
+
+# ---------------------------------------------------------------- 내용 기반 묶기
+
+
+def _kinds(groups):
+    return [g.kinds for g in groups]
+
+
+def _files(n):
+    return [f(f"{i:02d}-20260823_16{i:02d}00.jpg") for i in range(1, n + 1)]
+
+
+def test_both_photo_starts_a_new_product():
+    files = _files(4)
+    groups = group_by_content(files, ["both", "price_tag", "both", "price_tag"])
+    assert _kinds(groups) == [["both", "price_tag"], ["both", "price_tag"]]
+
+
+def test_product_then_tag_pairs_up():
+    files = _files(4)
+    groups = group_by_content(files, ["product", "price_tag", "product", "price_tag"])
+    assert _kinds(groups) == [["product", "price_tag"], ["product", "price_tag"]]
+
+
+def test_tag_first_then_product_pairs_up():
+    files = _files(4)
+    groups = group_by_content(files, ["price_tag", "product", "price_tag", "product"])
+    assert _kinds(groups) == [["price_tag", "product"], ["price_tag", "product"]]
+
+
+def test_two_product_photos_before_the_tag_stay_together():
+    files = _files(6)
+    groups = group_by_content(
+        files, ["product", "product", "price_tag", "product", "product", "price_tag"]
+    )
+    assert _kinds(groups) == [
+        ["product", "product", "price_tag"],
+        ["product", "product", "price_tag"],
+    ]
+
+
+def test_only_both_photos_split_one_per_product():
+    files = _files(3)
+    groups = group_by_content(files, ["both", "both", "both"])
+    assert _kinds(groups) == [["both"], ["both"], ["both"]]
+
+
+def test_other_photos_are_dropped():
+    files = _files(5)
+    groups = group_by_content(files, ["product", "price_tag", "other", "product", "price_tag"])
+    assert _kinds(groups) == [["product", "price_tag"], ["product", "price_tag"]]
+    assert all(g.files[0].name != files[2].name for g in groups)
+
+
+def test_missing_tag_does_not_swallow_everything():
+    files = _files(10)
+    groups = group_by_content(files, ["product"] * 10, max_size=6)
+    assert [len(g) for g in groups] == [6, 4]
+
+
+def test_group_indexes_are_renumbered():
+    files = _files(4)
+    groups = group_by_content(files, ["both", "other", "both", "price_tag"])
+    assert [g.index for g in groups] == [1, 2]
+
+
+def test_31_photos_do_not_collapse_into_two_products():
+    """실제로 겪은 사고: 31장이 2묶음이 되고 27장이 버려졌다."""
+    kinds = (["both", "price_tag"] * 15) + ["both"]
+    files = _files(31)
+    groups = group_by_content(files, kinds)
+    assert len(groups) == 16
+    assert sum(len(g) for g in groups) == 31

@@ -1,4 +1,3 @@
-from datetime import date
 
 from reborn.blog import BlogPost
 from reborn.vision import Product

@@ -66,6 +66,33 @@ class PhotoRead(BaseModel):
     )
 
 
+class PhotoClass(BaseModel):
+    index: int = Field(description="사진 번호 (1부터, 준 순서대로)")
+    kind: PhotoKind = Field(
+        description=(
+            "price_tag=가격표만 찍힘, product=상품만 찍힘, "
+            "both=상품과 가격표가 한 장에 같이 찍힘, other=상품 사진이 아님(매장 전경 등)"
+        )
+    )
+    hint: str = Field(description="무엇이 보이는지 5~15자로 아주 짧게. 예: '접이식 의자', '가격표 5만원대'")
+
+
+class PhotoBatch(BaseModel):
+    photos: list[PhotoClass] = Field(description="준 사진 수와 정확히 같은 개수로 답한다.")
+
+
+CLASSIFY_SYSTEM = """당신은 리본마켓 평택점의 콘텐츠 담당자입니다.
+매장에서 찍은 사진들을 한 장씩 분류합니다. 오직 분류만 하고 가격은 읽지 않습니다.
+
+- price_tag : 가격표(POP)만 찍힌 사진. 종이/스티커에 상품명과 가격이 적힌 것.
+- product   : 상품만 찍힌 사진. 가격표가 없거나 알아볼 수 없게 작게 나온 것.
+- both      : 한 장에 상품과 가격표가 같이 나온 사진.
+- other     : 매장 전경, 간판, 영수증, 사람만 나온 사진 등 상품 사진이 아닌 것.
+
+hint 에는 무엇이 보이는지 아주 짧게 적습니다. 나중에 같은 상품끼리 묶을 때 씁니다.
+반드시 준 사진 수와 같은 개수로, 준 순서 그대로 답합니다."""
+
+
 class ProductRead(BaseModel):
     """비전 모델이 사진에서 읽어내는 것 — 사진에 실제로 보이는 것만."""
 
@@ -238,6 +265,48 @@ class Product:
         return data
 
 
+def classify_photos(
+    client: LLMClient, photo_paths: list[Path], *, model: str, batch_size: int = 8
+) -> list[PhotoClass]:
+    """사진마다 가격표인지 상품인지 먼저 분류한다.
+
+    이걸 먼저 해야 같은 상품끼리 제대로 묶을 수 있다. 촬영 시각만으로 묶으면
+    연달아 찍은 여러 상품이 한 덩어리가 되어버린다(실제로 그렇게 됐다).
+    사진을 여러 장씩 묶어 한 번에 물어봐서 호출 수를 줄인다.
+    """
+    result: list[PhotoClass] = []
+    for start in range(0, len(photo_paths), batch_size):
+        chunk = photo_paths[start : start + batch_size]
+        parts: list[dict] = []
+        for i, path in enumerate(chunk, start=1):
+            parts.append(text_part(f"[{i}번 사진]"))
+            parts.append(image_part(path))
+        parts.append(
+            text_part(f"사진 {len(chunk)}장입니다. 각각 무엇이 찍혔는지 순서대로 분류해 주세요.")
+        )
+        try:
+            batch: PhotoBatch = client.structured(
+                system=CLASSIFY_SYSTEM,
+                parts=parts,
+                schema=PhotoBatch,
+                max_tokens=2000,
+                model=model,
+            )
+            got = {p.index: p for p in batch.photos}
+        except Exception as exc:
+            log.warning("사진 분류 실패(%d~%d번), 상품 사진으로 간주합니다: %s", start + 1, start + len(chunk), exc)
+            got = {}
+
+        for i in range(1, len(chunk) + 1):
+            found = got.get(i)
+            result.append(
+                found.model_copy(update={"index": start + i})
+                if found
+                else PhotoClass(index=start + i, kind="product", hint="")
+            )
+    return result
+
+
 def extract_product(
     client: LLMClient,
     photo_paths: list[Path],
@@ -248,6 +317,7 @@ def extract_product(
     source_name: str = "상품",
     source_kind: str = "refurb",
     eyebrow: str = "오늘의 리본 특가",
+    known_kinds: list[str] | None = None,
 ) -> Product:
     parts: list[dict] = []
     for i, path in enumerate(photo_paths, start=1):
@@ -270,6 +340,12 @@ def extract_product(
     for photo in read.photos:
         if 1 <= photo.index <= len(kinds):
             kinds[photo.index - 1] = photo.kind
+
+    # 1차 판독에서 "가격표"로 본 사진은 카드 배경으로 쓰지 않는다.
+    # 사진 한 장만 놓고 본 1차 판독이 더 보수적이라, 가격표가 카드에 실리는 사고를 막아준다.
+    for i, known in enumerate(known_kinds or []):
+        if i < len(kinds) and known == "price_tag":
+            kinds[i] = "price_tag"
 
     product = Product(
         product_name=read.product_name,

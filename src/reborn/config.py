@@ -151,7 +151,7 @@ def load_settings(path: Path | str | None = None) -> Settings:
         publish_hour=_env_int("PUBLISH_HOUR", int(schedule.get("publish_hour", 18))),
         max_gap_seconds=_env_int("MAX_GAP_SECONDS", int(grouping.get("max_gap_seconds", 150))),
         max_photos_per_group=_env_int(
-            "MAX_PHOTOS_PER_GROUP", int(grouping.get("max_photos_per_group", 4))
+            "MAX_PHOTOS_PER_GROUP", int(grouping.get("max_photos_per_group", 6))
         ),
         max_cards_per_day=_env_int("MAX_CARDS_PER_DAY", int(grouping.get("max_cards_per_day", 0))),
         provider=_env("LLM_PROVIDER", model.get("provider", "auto")),

@@ -41,6 +41,9 @@ def capture_time(file: DriveFile, tz: str = "Asia/Seoul") -> datetime:
     return file.created_time.astimezone(zone)
 
 
+MAX_GROUP_SIZE = 6  # 안전장치: 가격표를 빠뜨려도 한 묶음이 무한정 커지지 않게
+
+
 @dataclass
 class ProductGroup:
     """한 상품으로 추정되는 사진 묶음."""
@@ -48,6 +51,7 @@ class ProductGroup:
     index: int
     files: list[DriveFile]
     times: list[datetime] = field(default_factory=list)
+    kinds: list[str] = field(default_factory=list)
 
     @property
     def started_at(self) -> datetime:
@@ -96,3 +100,79 @@ def filter_for_day(
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# ---------------------------------------------------------------- 내용 기반 묶기
+
+
+def _new_group(index: int, file: DriveFile, kind: str, taken: datetime) -> ProductGroup:
+    group = ProductGroup(index=index, files=[file], times=[taken])
+    group.kinds = [kind]
+    return group
+
+
+def group_by_content(
+    files: list[DriveFile],
+    kinds: list[str],
+    *,
+    tz: str = "Asia/Seoul",
+    max_size: int = MAX_GROUP_SIZE,
+) -> list[ProductGroup]:
+    """사진 내용으로 같은 상품끼리 묶는다.
+
+    은성님 촬영 방식은 상품 하나당
+      · 상품 사진 1장 + 가격표 사진 1장 (순서는 상관없음), 또는
+      · 상품과 가격표가 같이 나온 사진 1장 (+ 가격표 근접 사진 1장)
+    이다. 그래서 **가격표가 상품의 경계**가 된다.
+
+    촬영 시각으로 묶던 예전 방식은 연달아 찍으면 전부 한 덩어리가 됐다
+    (31장이 2덩어리가 되고 뒤 27장이 버려졌다). 시계 대신 내용을 본다.
+
+    규칙:
+      · 새 상품 사진(both)이 오면 앞 묶음을 닫는다.
+      · 가격표는 한 묶음에 하나까지. 두 번째 가격표가 오면 새 상품이다.
+      · 이미 상품과 가격표가 다 있는 묶음에 상품 사진이 오면 새 상품이다.
+        (가격표만 있는 묶음에 오는 상품 사진은 그 가격표의 상품이다)
+      · other(매장 전경 등)는 버린다.
+    """
+    groups: list[ProductGroup] = []
+    current: ProductGroup | None = None
+
+    def close() -> None:
+        nonlocal current
+        if current is not None:
+            groups.append(current)
+            current = None
+
+    for file, kind in zip(files, kinds):
+        taken = capture_time(file, tz)
+
+        if kind == "other":
+            close()
+            continue
+
+        if current is not None:
+            tags = sum(1 for k in current.kinds if k == "price_tag")
+            products = sum(1 for k in current.kinds if k in ("product", "both"))
+            has_both = "both" in current.kinds
+
+            starts_new = (
+                kind == "both"
+                or (kind == "price_tag" and tags >= 1)
+                or (kind == "product" and (has_both or (tags >= 1 and products >= 1)))
+                or len(current.files) >= max_size
+            )
+            if starts_new:
+                close()
+
+        if current is None:
+            current = _new_group(len(groups) + 1, file, kind, taken)
+        else:
+            current.files.append(file)
+            current.times.append(taken)
+            current.kinds.append(kind)
+
+    close()
+    for i, group in enumerate(groups, start=1):
+        group.index = i
+    return groups

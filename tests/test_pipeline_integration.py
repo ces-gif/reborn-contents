@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -49,9 +48,12 @@ class FakeDrive:
 class FakeLLM:
     """LLMClient 흉내. schema 클래스 이름으로 응답을 고른다."""
 
-    def __init__(self, kinds_per_group=None):
+    def __init__(self, kinds_per_group=None, classify_kinds=None):
         self.calls: list[str] = []
         self.kinds_per_group = kinds_per_group  # [["price_tag"], ["price_tag","product"], ...]
+        # 1차 판독(사진 한 장씩 가격표/상품 구분)이 돌려줄 답을 준 순서대로 꺼내 쓴다
+        self.classify_kinds = list(classify_kinds or [])
+        self.assigned: list[str] = []  # 1차 판독에서 실제로 내준 답 (2차 판독도 같은 답을 낸다)
         self.searched: list[str] = []
         self.name = "fake"
 
@@ -61,11 +63,26 @@ class FakeLLM:
         if search:
             self.searched.append(name)
 
+        if name == "PhotoBatch":
+            images = [p for p in parts if p["type"] == "image"]
+            kinds = [
+                self.classify_kinds.pop(0) if self.classify_kinds else "product"
+                for _ in images
+            ]
+            self.assigned.extend(kinds)
+            return vision.PhotoBatch(
+                photos=[
+                    vision.PhotoClass(index=i + 1, kind=k, hint="") for i, k in enumerate(kinds)
+                ]
+            )
+
         if name == "ProductRead":
             images = [p for p in parts if p["type"] == "image"]
             idx = sum(1 for c in self.calls if c == "ProductRead")
             if self.kinds_per_group:
                 kinds = self.kinds_per_group[idx - 1]
+            elif self.assigned:
+                kinds = [self.assigned.pop(0) for _ in images]
             else:
                 kinds = ["both"] if len(images) == 1 else ["price_tag", "product"]
             return vision.ProductRead(
@@ -78,7 +95,9 @@ class FakeLLM:
                 sale_price=100000,
                 discount_pct=None,
                 price_source="가격표",
-                best_photo_index=len(kinds),
+                best_photo_index=next(
+                    (i for i, k in enumerate(kinds, start=1) if k in ("product", "both")), 0
+                ),
                 review_reason="",
             )
 
@@ -147,7 +166,8 @@ def wired(tmp_path, monkeypatch):
         ],
     }
     drive = FakeDrive(files_by_folder, photo.read_bytes(), logo.read_bytes())
-    client = FakeLLM()
+    # 리퍼 3장 = (상품+가격표) 1개 + (상품·가격표 한 장) 1개, 새상품 1장 = 1개
+    client = FakeLLM(classify_kinds=["product", "price_tag", "both", "both"])
 
     monkeypatch.setattr(pipeline, "Drive", lambda *a, **k: drive)
     monkeypatch.setattr(pipeline, "make_llm", lambda s: client)

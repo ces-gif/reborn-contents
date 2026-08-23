@@ -11,7 +11,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from .llm import LLMClient, text_part
+from .llm import text_part
 from .vision import Product
 
 log = logging.getLogger(__name__)

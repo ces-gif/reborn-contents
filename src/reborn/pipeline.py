@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import shutil
@@ -25,10 +24,10 @@ from .blog import write_post
 from .cardnews import CardData, render_card
 from .config import Settings, Source
 from .drive import Drive, DriveFile, upload_tree
-from .grouping import filter_for_day, group_photos
+from .grouping import capture_time, filter_for_day, group_by_content
 from .ranking import pick_best
 from .state import LEDGER_NAME, Ledger
-from .vision import Product, extract_product, save_products
+from .vision import Product, classify_photos, extract_product, save_products
 
 log = logging.getLogger(__name__)
 
@@ -140,6 +139,8 @@ def run(
         todays = filter_for_day(files, day_start, tz=settings.timezone)
         if not reprocess:
             todays = [f for f in todays if not ledger.seen(f.id)]
+        # 촬영 순서대로 세운다 — 내용으로 묶으려면 찍은 순서가 맞아야 한다.
+        todays.sort(key=lambda f: capture_time(f, settings.timezone))
         log.info("[%s] 전체 %d장 중 %s 신규 %d장", source.name, len(files), target_day, len(todays))
         per_source.append((source, todays))
         result.per_source[source.name] = len(todays)
@@ -163,25 +164,52 @@ def run(
     client = make_llm(settings)
 
     # 2) 폴더별로 상품 묶고 가격표 읽기 --------------------------------------
+    # 사진을 먼저 전부 받아서 "가격표냐 상품이냐"를 한 장씩 판독한 뒤,
+    # 그 내용으로 같은 상품끼리 묶는다. 촬영 시각으로 묶던 예전 방식은
+    # 연달아 찍으면 수십 장이 한 덩어리가 되어버렸다.
     remaining = settings.max_cards_per_day or None
     for source, files in per_source:
         if not files:
             continue
-        groups = group_photos(files, max_gap_seconds=settings.max_gap_seconds, tz=settings.timezone)
+
+        paths_by_id: dict[str, Path] = {}
+        for i, file in enumerate(files, start=1):
+            dest = work_dir / slugify(source.name) / f"{i:03d}-{file.name}"
+            if not dest.exists():
+                drive.download(file.id, dest)
+            paths_by_id[file.id] = dest
+
+        photo_paths = [paths_by_id[f.id] for f in files]
+        classes = classify_photos(client, photo_paths, model=settings.vision_model)
+        kinds = [c.kind for c in classes]
+        log.info(
+            "[%s] 사진 판독: 상품 %d · 가격표 %d · 상품+가격표 %d · 제외 %d",
+            source.name,
+            kinds.count("product"),
+            kinds.count("price_tag"),
+            kinds.count("both"),
+            kinds.count("other"),
+        )
+
+        groups = group_by_content(
+            files, kinds, tz=settings.timezone, max_size=settings.max_photos_per_group
+        )
         if remaining is not None:
+            if len(groups) > remaining:
+                log.warning(
+                    "[%s] 상품 묶음 %d개 중 하루 상한(%d)만큼만 만듭니다",
+                    source.name,
+                    len(groups),
+                    remaining,
+                )
             groups = groups[:remaining]
             remaining -= len(groups)
         result.groups += len(groups)
-        log.info("[%s] 상품 묶음 %d개", source.name, len(groups))
+        log.info("[%s] 사진 %d장 → 상품 묶음 %d개", source.name, len(files), len(groups))
 
         for group in groups:
-            picked = group.files[: settings.max_photos_per_group]
-            paths: list[Path] = []
-            for file in picked:
-                dest = work_dir / slugify(source.name) / f"{group.index:02d}-{file.name}"
-                if not dest.exists():
-                    drive.download(file.id, dest)
-                paths.append(dest)
+            paths = [paths_by_id[f.id] for f in group.files]
+            known = list(group.kinds)
             try:
                 product = extract_product(
                     client,
@@ -192,6 +220,7 @@ def run(
                     source_name=source.name,
                     source_kind=source.kind,
                     eyebrow=source.eyebrow,
+                    known_kinds=known,
                 )
             except Exception as exc:
                 log.error("[%s] 상품 %d번 정보 추출 실패: %s", source.name, group.index, exc)
