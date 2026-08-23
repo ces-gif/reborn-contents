@@ -20,6 +20,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import branding, instagram, llm, notify, research, social
+from .llm import LLMQuotaError
 from .blog import write_post
 from .cardnews import CardData, render_card
 from .config import Settings, Source
@@ -56,6 +57,8 @@ class RunResult:
     notified: dict[str, bool] = field(default_factory=dict)
     stories: instagram.PublishReport | None = None
     skipped_reason: str | None = None
+    quota_note: str | None = None
+    failed_groups: int = 0
 
     @property
     def published(self) -> list[Product]:
@@ -182,6 +185,7 @@ def run(
         photo_paths = [paths_by_id[f.id] for f in files]
         classes = classify_photos(client, photo_paths, model=settings.vision_model)
         kinds = [c.kind for c in classes]
+        items = [c.item for c in classes]
         log.info(
             "[%s] 사진 판독: 상품 %d · 가격표 %d · 상품+가격표 %d · 제외 %d",
             source.name,
@@ -192,7 +196,7 @@ def run(
         )
 
         groups = group_by_content(
-            files, kinds, tz=settings.timezone, max_size=settings.max_photos_per_group
+            files, kinds, items, tz=settings.timezone, max_size=settings.max_photos_per_group
         )
         if remaining is not None:
             if len(groups) > remaining:
@@ -222,7 +226,17 @@ def run(
                     eyebrow=source.eyebrow,
                     known_kinds=known,
                 )
+            except LLMQuotaError as exc:
+                result.quota_note = str(exc).split("\n")[0]
+                result.failed_groups += 1
+                log.error(
+                    "[%s] 상품 %d번부터는 하루 요청 한도를 다 써서 판독하지 못했습니다",
+                    source.name,
+                    group.index,
+                )
+                continue
             except Exception as exc:
+                result.failed_groups += 1
                 log.error("[%s] 상품 %d번 정보 추출 실패: %s", source.name, group.index, exc)
                 continue
             log.info(
@@ -401,6 +415,10 @@ def _report(result: RunResult, settings: Settings) -> str:
         f"- 카드뉴스: {len(result.cards)}장",
         f"- 블로그: {'생성' if result.blog_files else '없음'}",
     ]
+    if result.failed_groups:
+        lines.append(f"- ⚠️ 판독하지 못한 묶음: {result.failed_groups}개")
+    if result.quota_note:
+        lines += ["", "## ⚠️ 오늘 만들다 만 이유", result.quota_note]
     if result.stories is not None:
         if result.stories.skipped_reason:
             lines.append(f"- 인스타 스토리: 건너뜀 — {result.stories.skipped_reason}")
@@ -454,6 +472,10 @@ def print_summary(result: RunResult) -> None:
             print(f"   인스타 스토리: {len(result.stories.published)}건 게시")
     if result.needs_review:
         print(f"   ⚠️  확인 필요 {len(result.needs_review)}건")
+    if result.failed_groups:
+        print(f"   ⚠️  판독 실패 {result.failed_groups}개")
+    if result.quota_note:
+        print(f"   ⚠️  {result.quota_note}")
     if result.drive_folder_url:
         print(f"   드라이브: {result.drive_folder_url}")
     if result.notified:

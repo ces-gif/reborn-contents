@@ -111,9 +111,36 @@ def _new_group(index: int, file: DriveFile, kind: str, taken: datetime) -> Produ
     return group
 
 
+_NOISE = re.compile(r"[^0-9A-Za-z\uac00-\ud7a3]+")
+
+
+def _bigrams(text: str) -> set[str]:
+    clean = _NOISE.sub("", text)
+    if len(clean) < 2:
+        return {clean} if clean else set()
+    return {clean[i : i + 2] for i in range(len(clean) - 1)}
+
+
+def same_item(a: str, b: str, *, threshold: float = 0.25) -> bool:
+    """두 사진이 같은 상품을 가리키는가.
+
+    가격표에는 상품명이 적혀 있고 상품 사진에는 물건이 보인다. 1차 판독이
+    양쪽에서 뽑아준 이름을 글자 두 개씩(bigram) 겹쳐 본다.
+    이름을 못 읽었으면(빈 문자열) 판단하지 않고 True 로 둔다 —
+    확신이 없을 때 묶음을 쪼개면 멀쩡한 짝까지 갈라진다.
+    """
+    if not a.strip() or not b.strip():
+        return True
+    ga, gb = _bigrams(a), _bigrams(b)
+    if not ga or not gb:
+        return True
+    return len(ga & gb) / min(len(ga), len(gb)) >= threshold
+
+
 def group_by_content(
     files: list[DriveFile],
     kinds: list[str],
+    items: list[str] | None = None,
     *,
     tz: str = "Asia/Seoul",
     max_size: int = MAX_GROUP_SIZE,
@@ -134,17 +161,24 @@ def group_by_content(
       · 이미 상품과 가격표가 다 있는 묶음에 상품 사진이 오면 새 상품이다.
         (가격표만 있는 묶음에 오는 상품 사진은 그 가격표의 상품이다)
       · other(매장 전경 등)는 버린다.
+
+    items 를 주면(1차 판독이 읽어낸 상품 이름) 그게 우선한다. 이름이 서로
+    다른 사진은 규칙이 뭐라 하든 갈라놓는다. 실제로 가격표와 그 다음 상품
+    사진이 서로 다른 물건인 경우가 많았다(가격표 다음에 다음 상품을 찍으신다).
     """
+    names = list(items or [""] * len(files))
     groups: list[ProductGroup] = []
     current: ProductGroup | None = None
+    current_names: list[str] = []
 
     def close() -> None:
         nonlocal current
         if current is not None:
             groups.append(current)
             current = None
+        current_names.clear()
 
-    for file, kind in zip(files, kinds):
+    for file, kind, name in zip(files, kinds, names):
         taken = capture_time(file, tz)
 
         if kind == "other":
@@ -162,6 +196,9 @@ def group_by_content(
                 or (kind == "product" and (has_both or (tags >= 1 and products >= 1)))
                 or len(current.files) >= max_size
             )
+            # 이름이 다른 물건이면 규칙이 뭐라 하든 갈라놓는다.
+            if not starts_new and not all(same_item(name, seen) for seen in current_names):
+                starts_new = True
             if starts_new:
                 close()
 
@@ -171,6 +208,7 @@ def group_by_content(
             current.files.append(file)
             current.times.append(taken)
             current.kinds.append(kind)
+        current_names.append(name)
 
     close()
     for i, group in enumerate(groups, start=1):

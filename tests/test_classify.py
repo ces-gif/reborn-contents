@@ -27,7 +27,7 @@ class Client:
             raise RuntimeError("모델이 답을 안 했습니다")
         kinds = [self.answers.pop(0) if self.answers else "product" for _ in images]
         return vision.PhotoBatch(
-            photos=[vision.PhotoClass(index=i + 1, kind=k, hint="") for i, k in enumerate(kinds)]
+            photos=[vision.PhotoClass(index=i + 1, kind=k, item="") for i, k in enumerate(kinds)]
         )
 
 

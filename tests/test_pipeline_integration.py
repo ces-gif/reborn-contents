@@ -72,7 +72,7 @@ class FakeLLM:
             self.assigned.extend(kinds)
             return vision.PhotoBatch(
                 photos=[
-                    vision.PhotoClass(index=i + 1, kind=k, hint="") for i, k in enumerate(kinds)
+                    vision.PhotoClass(index=i + 1, kind=k, item="") for i, k in enumerate(kinds)
                 ]
             )
 

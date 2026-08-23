@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Sequence
@@ -40,6 +41,10 @@ _SUCCESSOR = re.compile(r"use\s+models/([A-Za-z0-9._-]+)")
 
 class LLMError(RuntimeError):
     pass
+
+
+class LLMQuotaError(LLMError):
+    """하루 요청 한도를 다 썼다. 더 불러봐야 전부 같은 오류라 여기서 멈춘다."""
 
 
 # --------------------------------------------------------------------- 입력
@@ -184,6 +189,22 @@ class GeminiClient(LLMClient):
         try:
             response = self._generate(model, contents, config)
         except Exception as exc:
+            wait = _quota_wait(exc)
+            if wait is not None:
+                log.warning("제미나이 분당 한도에 걸려 %.0f초 쉬었다가 다시 시도합니다", wait)
+                time.sleep(wait)
+                try:
+                    response = self._generate(model, contents, config)
+                    text = getattr(response, "text", None)
+                    if not text:
+                        raise LLMError(f"제미나이가 빈 응답을 돌려줬습니다({model}).")
+                    return text
+                except LLMError:
+                    raise
+                except Exception as retry_exc:
+                    exc = retry_exc
+            if _is_quota_error(exc):
+                raise LLMQuotaError(f"{QUOTA_HELP}\n(원문: {exc})") from exc
             successor = _successor_model(exc)
             if not successor:
                 raise LLMError(f"제미나이 호출 실패({model}): {exc}") from exc
@@ -282,6 +303,37 @@ class AnthropicClient(LLMClient):
 
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.S)
+
+
+_RETRY_DELAY = re.compile(r"[Rr]etry in ([0-9.]+)s")
+QUOTA_HELP = (
+    "제미나이 무료 등급의 하루 요청 수를 다 썼습니다. "
+    "https://aistudio.google.com/apikey 에서 API 키가 붙어 있는 프로젝트에 결제를 켜면 "
+    "한도가 풀립니다 (사진 판독은 하루 몇십 원 수준입니다). "
+    "제미나이 앱 구독(Google One AI)은 API 한도와 별개라 도움이 되지 않습니다."
+)
+
+
+def _quota_wait(exc: Exception) -> float | None:
+    """분당 한도라 잠깐 기다리면 되는 오류면 기다릴 초를 돌려준다.
+
+    하루 한도(PerDay)는 기다려도 안 풀리니 None 을 돌려 바로 포기한다 —
+    37초씩 헛기다리다 실행 시간만 날리는 게 제일 나쁘다.
+    """
+    message = str(exc)
+    if "RESOURCE_EXHAUSTED" not in message and "429" not in message:
+        return None
+    if "PerDay" in message:
+        return None
+    match = _RETRY_DELAY.search(message)
+    if not match:
+        return None
+    return min(float(match.group(1)) + 1, 65)
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    message = str(exc)
+    return "RESOURCE_EXHAUSTED" in message or "429" in message
 
 
 def _successor_model(exc: Exception) -> str | None:

@@ -74,7 +74,13 @@ class PhotoClass(BaseModel):
             "both=상품과 가격표가 한 장에 같이 찍힘, other=상품 사진이 아님(매장 전경 등)"
         )
     )
-    hint: str = Field(description="무엇이 보이는지 5~15자로 아주 짧게. 예: '접이식 의자', '가격표 5만원대'")
+    item: str = Field(
+        description=(
+            "이 사진의 상품이 무엇인지 짧게. "
+            "가격표 사진이면 가격표에 적힌 상품명, 상품 사진이면 눈에 보이는 물건 이름. "
+            "예: '1인용 공부 책상', '2단 빨래바구니', '게이밍 의자'. 모르겠으면 빈 문자열."
+        )
+    )
 
 
 class PhotoBatch(BaseModel):
@@ -89,7 +95,9 @@ CLASSIFY_SYSTEM = """당신은 리본마켓 평택점의 콘텐츠 담당자입�
 - both      : 한 장에 상품과 가격표가 같이 나온 사진.
 - other     : 매장 전경, 간판, 영수증, 사람만 나온 사진 등 상품 사진이 아닌 것.
 
-hint 에는 무엇이 보이는지 아주 짧게 적습니다. 나중에 같은 상품끼리 묶을 때 씁니다.
+item 에는 **그 사진의 상품이 무엇인지**를 짧게 적습니다. 이걸로 같은 상품끼리 묶습니다.
+가격표 사진이라면 가격표에 적힌 상품명을 그대로 적습니다 — 가장 중요합니다.
+상품 사진이라면 눈에 보이는 물건 이름을 적습니다. 가격은 적지 않습니다.
 반드시 준 사진 수와 같은 개수로, 준 순서 그대로 답합니다."""
 
 
@@ -266,7 +274,7 @@ class Product:
 
 
 def classify_photos(
-    client: LLMClient, photo_paths: list[Path], *, model: str, batch_size: int = 8
+    client: LLMClient, photo_paths: list[Path], *, model: str, batch_size: int = 16
 ) -> list[PhotoClass]:
     """사진마다 가격표인지 상품인지 먼저 분류한다.
 
@@ -302,7 +310,7 @@ def classify_photos(
             result.append(
                 found.model_copy(update={"index": start + i})
                 if found
-                else PhotoClass(index=start + i, kind="product", hint="")
+                else PhotoClass(index=start + i, kind="product", item="")
             )
     return result
 

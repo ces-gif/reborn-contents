@@ -159,3 +159,44 @@ def test_a_genuinely_broken_model_name_still_raises(monkeypatch):
 
     with pytest.raises(llm.LLMError, match="제미나이 호출 실패"):
         FakeGemini()._call(model="nope", system="s", contents=[], max_tokens=100, schema=Sample)
+
+
+# ------------------------------------------------------- 요청 한도(429) 다루기
+
+_PER_DAY = (
+    "429 RESOURCE_EXHAUSTED. Quota exceeded for metric: generate_content_free_tier_requests, "
+    "quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier'. Please retry in 37.5s."
+)
+_PER_MINUTE = (
+    "429 RESOURCE_EXHAUSTED. quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier'. "
+    "Please retry in 12.0s."
+)
+
+
+def test_per_minute_limit_says_how_long_to_wait():
+    assert llm._quota_wait(RuntimeError(_PER_MINUTE)) == pytest.approx(13.0)
+
+
+def test_per_day_limit_does_not_wait():
+    """하루 한도는 기다려도 안 풀린다. 37초씩 헛기다리면 실행 시간만 날린다."""
+    assert llm._quota_wait(RuntimeError(_PER_DAY)) is None
+
+
+def test_other_errors_are_not_quota_errors():
+    assert llm._quota_wait(RuntimeError("500 internal")) is None
+    assert not llm._is_quota_error(RuntimeError("500 internal"))
+    assert llm._is_quota_error(RuntimeError(_PER_DAY))
+
+
+def test_daily_quota_raises_a_quota_error_that_tells_the_user_what_to_do(monkeypatch):
+    client = llm.GeminiClient.__new__(llm.GeminiClient)
+    client.vision_model = client.writing_model = "gemini-3.6-flash"
+
+    def boom(model, contents, config):
+        raise RuntimeError(_PER_DAY)
+
+    monkeypatch.setattr(client, "_generate", boom)
+    monkeypatch.setattr(llm, "_swap", lambda c, o, n: c)
+    with pytest.raises(llm.LLMQuotaError) as caught:
+        client._call(model="gemini-3.6-flash", system="s", contents=[], max_tokens=10)
+    assert "결제를 켜면" in str(caught.value)

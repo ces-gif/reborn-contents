@@ -13,7 +13,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from .llm import LLMClient, LLMError, text_part
+from .llm import LLMClient, LLMError, LLMQuotaError, text_part
 from .vision import Product, strip_unevidenced_claims
 
 log = logging.getLogger(__name__)
@@ -85,6 +85,8 @@ def research_product(client: LLMClient, product: Product, *, model: str) -> Prod
             search=True,
             model=model,
         )
+    except LLMQuotaError:
+        raise
     except (LLMError, Exception) as exc:  # 검색 실패로 하루치 발행을 멈추지 않는다
         log.warning("'%s' 웹 검색 실패(설명 없이 진행): %s", product.product_name, exc)
         return product
@@ -108,6 +110,12 @@ def research_product(client: LLMClient, product: Product, *, model: str) -> Prod
 
 def research_all(client: LLMClient, products: list[Product], *, model: str) -> list[Product]:
     for product in products:
-        if product.publishable:
+        if not product.publishable:
+            continue
+        try:
             research_product(client, product, model=model)
+        except LLMQuotaError as exc:
+            # 한도를 다 썼으면 나머지도 전부 같은 오류다. 설명 없이 발행은 계속한다.
+            log.warning("하루 요청 한도를 다 써서 상품 설명 붙이기를 여기서 멈춥니다: %s", exc)
+            break
     return products

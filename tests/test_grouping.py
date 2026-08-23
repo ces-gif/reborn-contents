@@ -1,7 +1,13 @@
 from datetime import datetime, timezone
 
 from reborn.drive import DriveFile
-from reborn.grouping import capture_time, filter_for_day, group_by_content, group_photos
+from reborn.grouping import (
+    capture_time,
+    filter_for_day,
+    group_by_content,
+    group_photos,
+    same_item,
+)
 
 
 def f(name, created="2026-08-21T09:07:22Z"):
@@ -113,3 +119,38 @@ def test_31_photos_do_not_collapse_into_two_products():
     groups = group_by_content(files, kinds)
     assert len(groups) == 16
     assert sum(len(g) for g in groups) == 31
+
+
+# --------------------------------------------------- 상품 이름으로 잘못된 짝 끊기
+
+
+def test_same_item_matches_tag_text_to_product():
+    assert same_item("1인용 공부 책꽂이 책상", "책상")
+    assert same_item("FODOSS 가정용 모바일2단빨래바구니 대용량", "2단 빨래바구니")
+    assert not same_item("반려동물 텐트", "책상")
+    assert not same_item("게이밍 의자", "냉풍기")
+
+
+def test_same_item_is_undecided_when_a_name_is_missing():
+    """이름을 못 읽었으면 판단하지 않는다 — 멀쩡한 짝을 갈라놓지 않게."""
+    assert same_item("", "책상")
+    assert same_item("책상", "")
+
+
+def test_tag_and_next_products_photo_are_split_apart():
+    """실제로 겪은 사고: 가격표(반려동물)와 그 다음 상품 사진(책상)이 한 묶음이 됐다."""
+    files = _files(4)
+    groups = group_by_content(
+        files,
+        ["price_tag", "product", "price_tag", "product"],
+        ["반려동물 텐트", "1인용 공부 책상", "1인용 공부 책꽂이 책상", "2단 빨래바구니"],
+    )
+    assert _kinds(groups) == [["price_tag"], ["product", "price_tag"], ["product"]]
+
+
+def test_matching_names_keep_a_pair_together():
+    files = _files(2)
+    groups = group_by_content(
+        files, ["product", "price_tag"], ["게이밍 의자", "라이트 게이밍 의자 각도 조절"]
+    )
+    assert _kinds(groups) == [["product", "price_tag"]]
