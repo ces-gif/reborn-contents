@@ -1,0 +1,618 @@
+# SUMEX 거래처 · 납품서류 규칙 마스터
+#
+# 출처
+#   A = 전임자 인수인계서.xlsx        (2026-08-19)
+#   B = SUMEX 거래처관리표 인수인계 (2026-08-14, 담당자 현장 확인)
+#
+# ※ 개인정보(교수·간호사·담당자 실명, 휴대폰, 이메일)는 이 파일에 넣지 않는다.
+#    → data/private/contacts.yaml (git 제외) 에서 관리한다.
+#
+# copies      : 준비해야 할 서류 총 매수
+# stamp       : 병원 도장(날인)이 필요한가
+# distribution: 각 부를 어디에 두고 오는가 (합계 = copies)
+# conflicts   : 두 출처가 다르게 말하는 항목. 현장에서 확인해 확정할 것.
+
+meta:
+  owner: SUMEX 영업 담당
+  predecessor: 전임 담당자 (퇴사 예정, 법인폰 번호 승계)
+  updated: 2026-08-23
+  doc_default_copies: 4   # 특별한 규칙이 없으면 4장이 기본
+
+hospitals:
+
+  - id: snuh
+    name: 서울대학교병원
+    short: 서울대
+    tier: 상급종합
+    region: 서울 종로
+    priority: 상
+    consignment: 이지메디컴
+    doc_type: 거래명세서
+    delivery:
+      mode: 택배
+      process: |
+        간납사(이지메디컴) 시스템에서 재고조회 → 납품생성 → 수량 및 LOT No. 기입.
+        납품명세서를 동봉해 서울대학교병원 오산창고로 택배 발송.
+      recurring:
+        - 플라이트 후드 2주 간격 발송
+        - Shaver / RF Tip 발주 여부 주기적 확인
+    watch:
+      - "이지메디컴 7월 계산서 미발행 건 있음"
+      - "6·7월 shaver 류가 계산서에 반영 안 된 이유 파악 필요"
+    source: [A, B]
+
+  - id: snubh
+    name: 분당서울대학교병원
+    short: 분당서울대
+    tier: 상급종합
+    region: 경기 성남 분당
+    priority: 최상
+    consignment: null
+    doc_type: 거래명세서
+    doc:
+      copies: 4
+      stamp: null
+      distribution:
+        - { to: 헬스케어혁신파크 지하1층 관리팀, copies: 4 }
+    delivery:
+      site: 헬스케어혁신파크 (경기 성남시 분당구 돌마로 172) 지하 주차장
+      windows: ["09:00-11:00", "13:00-16:00"]
+      cold_chain_cutoff: "14:00"   # 냉장·냉동 품목은 이 시각 이전만 가능
+      packaging: 쇼핑백 말고 흰색 봉투에 넣어 방문
+      hard_rule: 시간대를 놓치면 그날 납품 불가 → 재방문
+    conflicts:
+      - field: delivery.site
+        A: "분당서울대병원에서 서류 4장 출력 후 헬스케어혁신파크 지하 1층 관리팀"
+        B: "납품처 헬스케어혁신파크 지하 주차장"
+        action: 첫 방문 시 실제 하차·제출 지점 확정
+    open:
+      - "실제 납품 품목 리스트 미확보 (냉장/냉동 해당 품목 별도 표시 필요)"
+    source: [A, B]
+
+  - id: amc
+    name: 서울아산병원
+    short: 아산
+    tier: 상급종합
+    region: 서울 송파
+    priority: 상
+    consignment: 메디굿파트너스 / 이지메디컴
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      stamp: true
+    delivery:
+      process: |
+        거래명세서 3장 출력.
+        ① 지하 1층 관리부 맞은편 창고에서 검수
+        ② 서관 3층 수술방 옆 중앙창고에서 검수
+        ③ 도장 수령
+        ④ 다시 지하 1층 창고로 가서 거래명세서 제출
+      note: 층 이동이 많아 시간 여유 필요
+    watch:
+      - "알파벤트 Expire date 조사 필요"
+      - "TS 접수된 스터넘 쏘 수리 진행 여부 논의 필요"
+    source: [A]
+
+  - id: severance-sinchon
+    name: 신촌세브란스병원
+    short: 세브란스
+    tier: 상급종합
+    region: 서울 서대문
+    priority: 상
+    consignment: 에비슨케어
+    doc_type: 거래명세서
+    doc:
+      copies: 1
+      stamp: false
+      distribution:
+        - { to: 5층 본관 수술방, copies: 1 }
+    delivery:
+      system: "SSCM (https://sscmx.yuhs.ac/m/login.ys)"
+      process: |
+        SSCM 사이트에서 LOT No.와 유효기간 기입 → 1장 출력
+        → 1층 물품검수실에서 검수 → 스티커 부착 → 5층 본관 수술방 납품.
+        모바일 검수도 SSCM 사이트에서 함께 진행해야 한다.
+      cadence: 주 1회 방문
+      avoid: 목요일 방문 자제 요청
+    watch:
+      - "시스템 7 수리 건 계산서 발행 여부 확인"
+      - "암병원 플라이트 헬멧 배터리·코드 구매 건, sevit 사이트에서 발주 여부 확인"
+      - "시스템 8 스터넘 쏘 TS 미회수 상태"
+    source: [A]
+
+  - id: sanggye-paik
+    name: 상계백병원
+    short: 상계백
+    tier: 종합병원
+    region: 서울 노원
+    priority: 중
+    consignment: 리노메디칼
+    doc_type: 거래명세서
+    doc:
+      copies: null
+      stamp: null
+    open:
+      - "납품 프로세스 미확인 — 간납사(리노메디칼)와 구매과에 확인 필요"
+      - "시스템 8 블레이드 코드는 잡혔으나 간납 연락 없음 → 구매과·간납 확인"
+      - "의공팀 시스템 6 국산 배터리 구매 견적 요청 대응"
+    source: [A]
+
+  - id: seoul-medical-center
+    name: 서울의료원
+    short: 서울의료원
+    tier: 공공 종합병원
+    region: 서울 중랑
+    priority: 중
+    consignment: null
+    doc_type: 선납서
+    doc:
+      copies: 2
+      stamp: false
+      fields_required: [환자명, 코드]
+      distribution:
+        - { to: 3층 수술방, copies: 2 }
+    delivery:
+      trigger: 사용분 발생 시
+      process: 선납서에 환자명·코드 기입 → 2부 출력 → 제품과 함께 3층 수술방 전달
+    source: [A]
+
+  - id: cheongdam-lion
+    name: 청담리온정형외과
+    short: 청담리온
+    tier: 의원
+    region: 서울 강남
+    priority: 상
+    consignment: 비엔제이홀딩스
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      stamp: null
+      granularity: 환자 1명당 거래명세서 1건   # 묶어서 쓰지 말 것
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 총무과, copies: 1 }
+        - { to: 자사 관리부, copies: 1 }
+    delivery:
+      trigger: 수술방 팀장이 사용분 발생 시 카톡으로 사진 전송
+      process: 받은 사진을 근거로 환자별 거래명세서 작성 → 3부 출력 → 배부
+      cadence: 주 1~2회
+    closing:
+      rule: 월 마감은 반드시 매월 1~3일 사이에 처리
+      why: 늦으면 간납사(비엔제이)에서 계속 전화가 온다
+    recurring:
+      - { every: 분기, task: "ICONIX 1.4mm Drill bit 무상 증여" }
+    cautions:
+      - "서류 오류에 매우 민감한 병원 — 거래명세서 작성 시 꼼꼼히 확인"
+    source: [A, B]
+
+  - id: seoul-jump
+    name: 서울점프정형외과
+    short: 서울점프
+    tier: 의원
+    region: 서울 광진 (아차산로 382)
+    priority: 상
+    consignment: null
+    doc_type: 거래명세서
+    doc:
+      copies: 4
+      stamp: false
+      distribution:
+        - { to: 사용부서, copies: 1 }
+        - { to: 병원 관리부(원무과 — 총무·심사), copies: 2 }
+        - { to: 자사 관리부, copies: 1 }
+    delivery:
+      mode: 택배 위주. 서류 처리할 때만 방문
+      trigger: 병동·수술방에서 문자로 발주 → 오는 즉시 택배 발송
+      urgency: 수술방 건은 기다리고 있으므로 최우선 처리
+      cadence: 2주 1회 방문하여 누적 납품 건을 일자별 거래명세서로 처리
+    conflicts:
+      - field: doc.distribution
+        A: "사용부서 1 / 병원 관리부 2 / 수멕스 1"
+        B: "원무과에 3장 제출, 1장만 자사 보관 (도장 불필요)"
+        action: 사실상 동일. 원무과 = 총무·심사 창구로 확정
+    products:
+      외래: [콜라겐]
+      기타: [스킨본드, 기구류]
+    open:
+      - "과별 사용 품목 정리표 필요 (품목 수가 매우 많음)"
+    source: [A, B]
+
+  - id: hyemin
+    name: 혜민병원
+    short: 혜민
+    tier: 종합병원
+    region: 서울 광진
+    priority: 중
+    consignment: "윤찬 (※ 급여 제품에 한해서만 거래)"
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 별관 구매과, copies: 1 }
+        - { to: 자사 관리부, copies: 1 }
+    watch:
+      - "관절경 장비 구매 건 지속 F/U"
+      - "AS 수리비 청구 범위: Arthroscope·Pneumosure 는 청구 예정 / Laparo Bariatric Scope·Easyflow 펌프는 청구 어려움"
+    source: [A]
+
+  - id: muchuck-naeun
+    name: 연세무척나은병원
+    short: 무척나은
+    tier: 병원 (척추·관절)
+    region: 서울 광진 (천호대로 568)
+    priority: 상
+    consignment: null
+    doc_type: 거래명세서
+    doc:
+      copies: 4
+      stamp: false            # B: 도장 불필요 (세종스포츠와 다름)
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 옆 건물 총무과, copies: 2 }
+        - { to: 자사 관리부, copies: 1 }
+    conflicts:
+      - field: doc.distribution
+        A: "수술방 1 / 심사과 1 / 총무과 1 / 수멕스 1"
+        B: "수술방 1 / 옆 건물 총무과 2 / 우리 1  (도장 불필요)"
+        action: 다음 방문 때 총무과에서 확정. 확정 전에는 4장 준비 후 현장 배분
+    cautions:
+      - "수량 확인을 특히 꼼꼼히 — 2026-08-14 수량 오투입으로 회수 발생"
+      - "납품 시 품목·수량을 담당자와 그 자리에서 함께 확인하고 기록으로 남길 것"
+    watch:
+      - "매월 써지실 4~5박스 사용 중"
+      - "Attachment 수리 건 지속 발생"
+      - "신우메디텍 통해 수리했던 건 청구 필요 / 수멕스 데모 파손분 수리비 청구 필요"
+    open:
+      - "들어가는 품목 미파악"
+      - "수간호사 인수인계 인사 미완료 → 재방문"
+    source: [A, B]
+
+  - id: seoul-hyundai
+    name: 서울현대병원
+    short: 서울현대
+    tier: 병원
+    region: 서울
+    priority: 중
+    consignment: null
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 구매과 (별관 지하 1층), copies: 1 }
+        - { to: 자사 관리부, copies: 1 }
+    watch:
+      - "2026-01 1688 납품 후 관리 단계. 소모품 발주 유도 영업 필요"
+    source: [A]
+
+  - id: haneul
+    name: 하늘병원
+    short: 하늘
+    tier: 병원
+    region: 서울
+    priority: 중
+    consignment: null
+    doc_type: 거래명세서
+    doc:
+      copies: 4
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 심사과, copies: 1 }
+        - { to: 총무과, copies: 1 }
+        - { to: 자사 관리부, copies: 1 }
+    closing:
+      rule: 매월 초 구매과에 매출원장 전달
+      collection: 구매과와 일정 논의 후 월말 즈음 직접 방문하여 카드 수금
+    watch:
+      - "Arthrocare tip 사용 중. 케이스 감소로 2달에 1회 정도 발주"
+      - "Crossfire 영업 기회"
+    source: [A]
+
+  - id: guri-central
+    name: 구리센트럴병원
+    short: 구리센트럴
+    tier: 종합병원
+    region: 경기 구리 (검배로 46)
+    priority: 상
+    consignment: 아네스네트웍스
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 총무과, copies: 1 }
+        - { to: 자사, copies: 1 }
+    delivery:
+      process: |
+        ① 아네스네트웍스에 '간납금액'으로 작성한 거래명세서를 메일 발송
+        ② 아네스가 회신한 거래명세서를 받아서
+        ③ 그 서류로 병원에 납품
+      note: 서울권 밖이므로 방문 동선 마지막에 배치
+      staff_window: 16:45 이후 담당 부재 가능
+    watch:
+      - "8월 초 튜빙 납품 2건 거래명세서 처리 필요 (아이두메디에 서류 요청)"
+      - "매월 500만원씩 장비 구매·AS 수리비 입금 중"
+      - "수술방 팀장 9월 중순 퇴사 예정 → 후임 관계 재구축 필요"
+    source: [A, B]
+
+  - id: sejong-sports
+    name: 세종스포츠정형외과
+    short: 세종스포츠
+    tier: 의원 (입원·수술)
+    region: 서울 광진 (능동로 209, 대양 AI센터 1~2층)
+    priority: 상
+    consignment: 스타메디홀딩스
+    doc_type: 거래명세서
+    doc:
+      copies: 4
+      stamp: true
+      stamp_kinds: [수술실, 재무팀, 심사팀]   # 도장 3종 — 하나라도 빠지면 반려
+      distribution:
+        - { to: 수술실 (도장 후 그 자리에서 제출), copies: 1 }
+        - { to: 재무팀함, copies: 1 }
+        - { to: 심사팀함, copies: 1 }
+        - { to: 자사 보관 (도장 전부 찍힌 것), copies: 1 }
+      note: 총무(재무팀)·심사팀은 본원이 아니라 버거킹 옆 건물 3층
+    delivery:
+      trigger: 사용분을 문자로 수신
+      process: 사용분 문자 수신 → 담당 주임에게 전달 → 빠르게 팩스로 회신
+      speed: "'빠르게'가 중요하다고 병원 측이 강조"
+    closing:
+      rule: 매월 초, 도장 받은 거래명세서 스캔본 + 간납금액 거래명세서를 메일로 전달
+    products:
+      main: [ICONIX (Stryker 아이코닉스)]
+      unconfirmed: ["'다이렉스'로 들린 병용 제품 1종 — 정확한 제품명 확인 필요"]
+    source: [A, B]
+
+  - id: seoul-spine
+    name: 서울척병원
+    short: 서울척
+    tier: 병원 (척추 전문)
+    region: 서울 성북 (동소문로47길 8)
+    priority: 최상
+    risk: 최대 리스크 계정
+    consignment: 지이아이글로벌
+    doc_type: 거래명세서
+    doc:
+      copies: 3            # ★ 다른 병원은 4장, 여기만 3장
+      stamp: true
+      source_system: 간납사 사이트에서 환자별 거래명세서 출력
+      distribution:
+        - { to: 14층 수술실 (도장), copies: 1 }
+        - { to: 지하 2층 총무팀, copies: 1 }
+        - { to: 자사 보관, copies: 1 }
+      note: 수술실 14층 / 총무팀 B2 — 건물 위아래 끝을 오가므로 시간 여유 필요
+    supply_model:
+      type: 렌트(대여)
+      detail: 앵커·기구류를 렌트로 넣어두고 사용분을 정산. 기구 1자루 20~25만원 수준
+      caution: 회수·정산 누락 시 재고 손실 직결
+    watch:
+      - "집도의 교체 후 ICONIX(소프트 앵커) 사용 중단 → 2026-08-14 회수, 세팅 5개로 축소"
+      - "월 매출 약 700만원이 걸린 건"
+      - "사용 중단 사유 3가지 중 무엇인지 확정 필요: ①손맛 ②고정력 불만 ③적응증 케이스 부재"
+      - "회수품은 개봉 이력이 있으면 타 병원에서 받지 않음 → 처리 방침 회사 협의"
+      - "남겨둔 1.4 기구 1세트 사용 여부 추적"
+    parking: 평일 17:00까지
+    source: [A, B]
+
+  - id: kimnjo
+    name: 김앤조정형외과
+    short: 김앤조
+    tier: 의원
+    region: 서울
+    priority: 중
+    consignment: 엠피케이바이오솔루션
+    doc_type: 거래명세서
+    doc_variants:
+      - product: 플라이트 후드
+        copies: 0
+        note: 병원 측 거래명세서 처리 불필요. 대표가 직접 병원 납품 → 엠피케이에 거래명세서만 전달
+      - product: VT band
+        copies: 3
+        mode: 발주 오면 택배 발송
+        distribution:
+          - { to: 수술방, copies: 1 }
+          - { to: 5층 관리부, copies: 1 }
+          - { to: 자사, copies: 1 }
+    watch:
+      - "시스템 9 드릴 데모 진행 중 — 피드백 좋음, F/U 필요"
+    source: [A]
+
+  - id: nowon-eulji
+    name: 노원을지대학교병원
+    short: 노원을지
+    tier: 종합병원 / 대학병원
+    region: 서울 노원 (한글비석로 68)
+    priority: 최상
+    consignment: 토탈메디칼
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      author: 토탈메디칼이 사용분을 확인하여 '병원 양식'으로 작성
+      route_order: [토탈메디칼, 수술방, 심사과, 토탈메디칼]   # 이 순서를 지켜야 함
+    doc_submission_points:
+      - { what: 세금계산서 · 데모 후 제출 서류, where: 지하 관리팀 (을지의생명과학연구소) }
+      - { what: 심사마감 서류, where: 본관 밖 별관 건물 }
+    closing:
+      rule: 월초 마감 때 사용분을 몰아서 납품
+      how_to_find_deadline: |
+        마감 기간 알림이 따로 오지 않는다.
+        매월 1일에 토탈메디칼 사이트에 직접 들어가 마감 기간을 확인할 것.
+      penalty: 마감일을 놓치면 대금 지급이 밀린다
+    watch:
+      - "1788 풀세트 데모 기회 — 스트라이커 Commercial Reporting Team에 접수"
+      - "집라인 현재 정형외과에서만 사용 → 타 부서 확장 영업"
+    source: [A, B]
+
+  - id: seoul-redcross
+    name: 서울적십자병원
+    short: 적십자
+    tier: 종합병원
+    region: 서울 종로 (새문안로 9)
+    priority: 최상
+    consignment: null
+    doc_type: 거래명세서
+    doc:
+      copies: 5           # ★ 가장 많음
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 지하 1층 물품관리실, copies: 1 }
+        - { to: 4층 보험심사팀, copies: 1 }
+        - { to: 총무팀, copies: 1 }
+        - { to: 자사, copies: 1 }
+    delivery:
+      trigger: 병원 구매과에서 발주 메일 수신
+    cautions:
+      - "★ 응대 속도가 관건인 계정 — 결론이 안 나도 중간 상황을 먼저 알릴 것"
+      - "회신 지연 자체가 불만 요인이 된다"
+      - "스트라이커 구형 장비가 많아 AS 요청이 잦고, 항상 방문을 원한다"
+    watch:
+      - "2026-08-13 회수 장비 AS 가능 여부 확정 필요 (불가 가능성 높음)"
+      - "라파로 기구류 스톨즈 건 — 오래 지연된 건, 빠른 조치 필요"
+    source: [A, B]
+
+  - id: seongnam-medical-center
+    name: 성남시의료원
+    short: 성남시의료원
+    tier: 공공 종합병원
+    region: 경기 성남
+    priority: 중
+    consignment: 파마블루
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      source_system: 파마블루가 월 2회 거래명세서를 업체측으로 발송
+      distribution:
+        - { to: 3층 수술방, copies: 1 }
+        - { to: 2층 중앙창고, copies: 1 }
+        - { to: 자사, copies: 1 }
+      after: 납품 후 서명 받은 거래명세서를 파마블루 담당 이사에게 문자로 전송
+    watch:
+      - "담당 교수 매주 수요일 진료 (해당 요일 방문 유리)"
+      - "Reelx 앵커 5.5mm → 4.5mm 교체 필요"
+    source: [A]
+
+  - id: cheongdam-harrison
+    name: 청담해리슨병원
+    short: 청담해리슨
+    tier: 병원
+    region: 서울 강남
+    priority: 중
+    consignment: null      # 인수인계서상 공란 — 확인 필요
+    doc_type: 거래명세서
+    doc:
+      copies: 3
+      distribution:
+        - { to: 수술방, copies: 1 }
+        - { to: 지하 2층 총무과, copies: 1 }
+        - { to: 자사, copies: 1 }
+    open:
+      - "간납사 여부 확인 필요 (인수인계서 공란)"
+    watch:
+      - "크로스파이어 납품 후 소모품 발주 유도"
+      - "RF Tip 샘플링 필요"
+    source: [A]
+
+  - id: korea-univ
+    name: 고려대학교병원 (안암·안산·구로)
+    short: 고대
+    tier: 상급종합
+    region: 서울 성북 / 경기 안산 / 서울 구로
+    priority: 상
+    consignment: 스마트엠
+    doc_type: 선납서
+    doc:
+      copies: 3
+      route_order: [스마트엠 검수, 수술방 검수]
+    closing:
+      announced: 월 초에 간납사 사이트에 마감 일정 공지
+      bundle:                       # 마감 시 반드시 함께 들고 가야 하는 서류
+        - 계산서 1부
+        - 사이트에 업로드된 거래명세서 3부
+        - 한 달 동안 납품한 선납서 전체
+      hard_rule: |
+        거래명세서에 나타난 제품 수량의 합 == 한 달간 납품한 선납서 제품 수량의 합
+        두 값이 같아야 마감이 정상 처리된다.
+        서류가 미비하거나 선납서를 분실하면 마감을 도와주지 않는다.
+      time_limit: 구로·안암은 수술방 마감 시 오후 4시 이전 방문
+      order: [수술방, 스마트엠]
+    watch:
+      - "안암·안산·구로 모두 알파벤트 사용 중 — 정기 방문으로 라포 유지"
+      - "캐뉼라 신규 코딩 건은 하반기 재제안"
+      - "안산병원 플라이트 헬멧 구매 건 소통 필요"
+    source: [A]
+
+# ─────────────────────────────────────────────────────────────
+# 신규 · 기회 계정 (아직 정규 납품 프로세스 없음)
+# ─────────────────────────────────────────────────────────────
+prospects:
+
+  - id: hosu
+    name: 호수병원 (일산)
+    tier: 일반병원 — 관절·척추
+    region: 경기 고양 일산동구 고양대로 761
+    opens: 2026-09-01
+    priority: 최상
+    why: |
+      76병상 / 직원 60명 / 전문의 5명(정형 2·신경외과 1·내과 1·영상 1).
+      수술실 스크럽 간호사 채용 중 + 마취통증의학과 보유 = 수술하는 병원 확정.
+      공동대표가 서울척병원 관절센터 출신(무릎 인공관절·관절경·ACL 재건).
+      개원 전인 지금이 장비·소모품 벤더가 결정되는 시점.
+    proposal_package:
+      - { rank: 1, item: "1788 4K 카메라 시스템 + 관절경 타워", why: "관절경 술기의 시작점. 개원 세팅에서 가장 먼저 결정됨" }
+      - { rank: 1, item: "셰이버 / 버 / RF (Arthroscopic Resection)", why: "카메라와 세트로 움직이는 소모품 축" }
+      - { rank: 1, item: "Fluid Management (관절경 펌프)", why: "카메라·셰이버와 함께 관절경 3종 세트" }
+      - { rank: 2, item: "VersiTomic / VersiTomic RR / ProCinch", why: "ACL·PCL 재건 및 반월상연골 근위부 봉합 — 세부전공과 정확히 일치" }
+      - { rank: 2, item: "ICONIX (Knotless / HA+)", why: "어깨·고관절 관절와순 봉합. 기존 실적 있음" }
+      - { rank: 3, item: "AlphaVent", why: "하드바디 앵커 — '손맛' 이슈 대비 타입 2종 동시 제안" }
+    strategy: |
+      낱개가 아니라 패키지로. 카메라+펌프+셰이버·RF+임플란트를 묶어야 경쟁사가 못 낀다.
+      렌트 조건을 제안할 경우 최소 사용 물량과 회수 조건을 반드시 문서로 남길 것.
+    source: [B]
+
+  - id: sinwoo-meditech
+    name: 신우메디텍
+    kind: 협력사 (사설 수리업체)
+    region: 경기 성남 중원구 상대원동 5442-1 크란츠테크노
+    role: 소모품·기구 수리 위탁
+    open:
+      - "정확한 층수·호실 확인 (사업자등록상 714호 / 기억은 6층) — 방문 전 전화"
+    source: [B]
+
+# ─────────────────────────────────────────────────────────────
+# 공급사 (거래처 아님)
+# ─────────────────────────────────────────────────────────────
+suppliers:
+
+  - id: stryker-korea
+    name: 한국스트라이커(주)
+    sites:
+      - { name: 본사 (강남), address: "서울 강남구 영동대로 517 아셈타워 6층", for: [장비 고장, 수리 접수], team: Technical Service }
+      - { name: 장비·물류 거점 (송파), address: "서울 송파구 송파대로 55 서울복합물류단지 A동 603-2호", for: [데모 요청, 장비, 재고, 데모품 회수], team: Commercial Reporting Team }
+    demo_form: "KQF-OPC-009-F Korea Demo Receipt Form"
+    repair_playbook:
+      - 병원에 완료 날짜를 먼저 약속하지 않는다. "접수하고 예상 일정 확인해서 바로 회신드리겠습니다"로 끊는다.
+      - 접수 시 세 가지를 함께 확인 — ①예상 소요 기간 ②부품 재고 유무 ③대체 장비(loaner) 대여 가능 여부
+      - 대체 장비 대여 여부를 매번 확인한다. 병원이 화내는 실제 이유는 수리 지연이 아니라 수술 일정이 밀리는 것이다.
+      - 진행 상황은 병원이 묻기 전에 먼저 연락한다.
+      - 접수일 / 병원 / 증상 / 스트라이커 회신 / 예상 완료일 / 실제 완료일을 대장으로 관리한다.
+    source: [B]
+
+# ─────────────────────────────────────────────────────────────
+# 간납사 (도매상) 목록 — 거래처별 매핑은 위 hospitals[].consignment 참조
+# ─────────────────────────────────────────────────────────────
+consignors:
+  - { name: 이지메디컴,       hospitals: [snuh, amc] }
+  - { name: 메디굿파트너스,   hospitals: [amc] }
+  - { name: 에비슨케어,       hospitals: [severance-sinchon] }
+  - { name: 리노메디칼,       hospitals: [sanggye-paik] }
+  - { name: 비엔제이홀딩스,   hospitals: [cheongdam-lion] }
+  - { name: 윤찬,             hospitals: [hyemin], note: 급여 제품에 한해서만 거래 }
+  - { name: 아네스네트웍스,   hospitals: [guri-central] }
+  - { name: 스타메디홀딩스,   hospitals: [sejong-sports] }
+  - { name: 지이아이글로벌,   hospitals: [seoul-spine] }
+  - { name: 엠피케이바이오솔루션, hospitals: [kimnjo] }
+  - { name: 토탈메디칼,       hospitals: [nowon-eulji] }
+  - { name: 파마블루,         hospitals: [seongnam-medical-center] }
+  - { name: 스마트엠,         hospitals: [korea-univ] }

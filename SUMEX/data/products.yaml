@@ -1,0 +1,259 @@
+# SUMEX 취급 품목 마스터
+#
+# 출처: SUMEX 주력 품목 심층 매뉴얼 Vol.2, 의료기기 산업 학습보고서 Vol.1,
+#       Google Drive「제품 관련 자료」폴더 구성, 실제 거래명세서·데모인수증
+#
+# categories: 카테고리 → 품목
+# 각 품목: 임상(어디에 쓰나) / 공학(무엇으로 만들었나) / 영업(어떻게 파나)
+#
+# ※ 단가·상한금액은 이 파일에 넣지 않는다. 고시 개정으로 계속 바뀌며,
+#    공개 저장소에 둘 정보가 아니다. → data/private/pricing.yaml
+
+meta:
+  vendor_main: Stryker (한국스트라이커)
+  updated: 2026-08-23
+
+categories:
+
+  - id: visualization
+    name: 영상 (Endoscopy)
+    depts: [OS 관절경, GS 복강경, TS 흉강경, URO, ENT]
+    items:
+      - id: p1788
+        name: 1788 Advanced Imaging Platform
+        aka: [1788, 1788 4K]
+        what: 4K + 형광(AIM) 통합 영상 플랫폼. 카메라 헤드·스코프 교체만으로 관절경/복강경/흉강경 전환
+        key_parts: [CCU, 카메라 헤드, 커플러, 광원 L11, 스코프, 4K OLED 모니터, 카트]
+        sell: |
+          캐피털(장비) → 소모품 razor-razorblade 구조.
+          타워 1건이 이후 수년치 카메라 헤드 수리·커플러·스코프·광케이블·드레이프를 끌고 온다.
+        pitch: "1688이 4K에 형광을 처음 설계해 넣은 세대라면, 1788은 그 형광을 다시 만든 세대입니다. Tone Mode로 어두운 부위가 살아나고 32인치 4K OLED로 블랙이 깊습니다."
+        accounts: [seoul-redcross, nowon-eulji, seoul-hyundai, snubh, hosu]
+
+      - id: p1688
+        name: 1688 AIM 4K Platform
+        what: 2019년 출시. 4K 플랫폼에 형광을 처음부터 설계해 넣은 최초 시스템
+        part_numbers:
+          CCU: 1688-010-000
+          카메라헤드_Cmount: 1688-210-105
+          인라인_카메라헤드: 1688-710-105
+          일체형커플러_헤드: 1688-610-122
+          커플러_20mm: 1688-020-122
+          현미경카메라: 1688-210-080
+          광원_L11: 0220-230-300
+        error_codes:
+          E01: { meaning: Video Error, first_action: 전원 재기동, depot: 메인보드 → 디지털보드 }
+          E02: { meaning: Console Overheating, first_action: 통풍구·랙 공간 확인 후 재기동, depot: 팬 → 디지털보드 }
+          E03: { meaning: Software Mismatch, first_action: 전원 재기동, depot: 버전 확인 후 소프트웨어 업그레이드 }
+          E05: { meaning: Unauthorized Component, first_action: 정품 케이블 여부·커넥터 상태 확인, depot: 디지털보드 → 트랜지션보드,
+                 sales_note: "비정품 케이블에서 자주 발생. ProCare(정품 서비스 계약)의 가치를 설명할 최적의 순간" }
+        service_docs: [TSI10398 Rev.F, TSI10413 Rev.D, QIP11333, QIP11515, QIP11314, QIP0053-SJC]
+
+  - id: large_bone_power
+    name: 대골 파워툴
+    depts: [OS 인공관절, OS 외상]
+    items:
+      - id: system9
+        name: System 9
+        aka: [시스템 9, SYSTEM 9]
+        lineage: OP 90(1983) → S2000(1991) → System 4/5/6/7/8 → System 9(2023)
+        handpieces:
+          - { name: Sagittal saw, pn: 9208-000-000, use: 인공슬관절 대퇴·경골 절삭 }
+          - { name: Reciprocating saw, pn: 9206-000-000, use: 좁은 공간 절골, 재치환 시 임플란트 분리 }
+          - { name: Sternum saw, pn: 9207-000-000, use: 개흉 심장수술 }
+          - { name: SABO Sagittal Saw, pn: 4608-000-000, use: 족부·수부·소아 }
+          - { name: Precision Saw, pn: 9209-000-000, use: 팁만 진동 — 연부조직 손상 최소 }
+          - { name: Single trigger rotary drill, pn: 9203-000-000 }
+          - { name: Dual trigger rotary drill, pn: 9205-000-000 }
+          - { name: Cordless driver, pn: 4605-000-000 }
+          - { name: CD NXT handpiece, pn: 4607-000-000 }
+          - { name: EZout System, pn: 9202-999-000, use: 인공고관절 재치환 비구컵 제거 }
+        battery:
+          large: { pack: 9215-000-000, 비멸균: 9126-110-000, 하우징: 9126-120-000, 실드: 9126-130-000 }
+          small: { pack: 9212-000-000, 비멸균: 9222-110-000, 하우징: 9222-120-000, 실드: 9222-130-000 }
+          charger: 9110-120-000US
+          indicator:
+            녹색_상시: 완전 충전 — 사용 가능
+            황색_점멸: 저전압, 약 2분 미만 절삭 가능 → 즉시 예비 배터리 준비
+            황색_상시: 완전 방전 또는 오류 → 교체, 반복 시 접점·하우징 점검
+        design_points: [Twist-lock 인터페이스, 배터리 인디케이터 개선, IPX9 + 아노다이징, 안전 포켓, 인체공학 핸들, 무선 충전기]
+        sell: |
+          무선 충전기로 블루랩(멸균 포장) 상태 그대로 충전 가능 → 멸균을 깨지 않는다.
+          수술실 간호팀에게 이 한 가지만 정확히 전달해도 도입 호감도가 크게 오른다.
+        cleaning_agents:   # 단가는 낮지만 소진 주기가 짧고 예산 승인이 쉬운 재구매 품목
+          - { pn: 3000-009-000, name: Auto62 효소 세정제 }
+          - { pn: 3000-010-000, name: Auto62 중성 세제 }
+          - { pn: 3000-011-000, name: Auto62 기구 윤활제 }
+          - { pn: 3000-003-000, name: Blu62 전처리 폼 }
+          - { pn: 3000-008-000, name: E62 효소 세정제 }
+
+  - id: ns_power
+    name: 신경외과·척추 파워
+    depts: [NS, 척추]
+    items:
+      - id: core2_hsd
+        name: CORE 2 콘솔 + High Speed Drill (HSD)
+        pn: { console: 5400-052-000 }
+        ports: { 핸드피스: 3, 풋스위치: 2, 관류카세트: 1 }
+        capability: 드릴 2개 + 관류 + Bone Mill 동시 운용
+        presets: 100개 저장·전송
+        clinical:
+          개두술: 두개골 절개·천공 — 경막 손상 위험
+          추궁절제술: 척추 후궁 삭제로 신경 감압
+          ACDF: 추간판·골극 제거 — 척수·척추동맥 손상 위험
+          종양절제: 두개저 골 삭제
+        burs: { 라운드: 일반 삭제, 매치스틱: 좁은 홈, 다이아몬드: 경막 근처 — 절삭력 낮고 연부조직 손상 위험 적음 }
+        sell: |
+          설치 당일 교수별 프리셋 세팅이 계약의 마지막 단계다.
+          프리셋을 안 잡아주면 아무리 좋은 콘솔도 "손에 안 맞는다"는 평가를 받는다.
+        accounts: [muchuck-naeun, seoul-redcross]
+
+  - id: skin_closure
+    name: 피부봉합
+    depts: [OS, NS, GS 전 과]
+    items:
+      - id: zip
+        name: Zip Surgical / ZipSeal / PreLoc
+        aka: [집라인, Zip Line]
+        what: 봉합사·스테이플러를 대체하는 비침습 표피 봉합 장치
+        must_say: "Zip은 표피 봉합만 대체합니다. 진피와 피하조직은 선생님이 그대로 봉합하셔야 합니다."
+        tech: { 동적압박: 교차 천공으로 길이 방향 유연성, 격리구역: 스캐폴드가 창상을 견인력에서 차단 }
+        material: { 접착층: 하이드로콜로이드(장루 주머니 계열), 외곽: 탄성 폴리우레탄, 잠금: 나일론 락 1mm 조절 }
+        lines:
+          - { name: Zip Surgical, gap: "2~3mm 권장 / 최대 5mm" }
+          - { name: ZipSeal, note: "Zip Surgical + LiquiBand OCTYL" }
+          - { name: PreLoc, gap: 최대 2cm, use: 궤양·고장력 창상 }
+          - { name: Zip DS Dressing Shield, use: 드레싱 접착제로부터 Zip 보호 }
+        evidence:
+          적용속도: 봉합사 대비 3배 빠름
+          견인력저항: 봉합사 대비 8배
+          드레싱교체통증: 스테이플 대비 1/4
+          굴곡각도: 스테이플 대비 최대 10도 추가
+          임상: 동료심사 논문 21편, 30개국 60만 건 이상
+        apply_steps:
+          - 라이너 #1 제거 (장갑이 접착면에 닿지 않게)
+          - 절개선 길이·폭 중앙 정렬 — 한 번 피부에 닿으면 들어 올리지 않는다
+          - 라이너 #2를 몇 cm씩 벗기며 "걸어가듯" 눕힌다 (늘이지 말 것)
+          - 락 박스를 잡고 스트랩 하나씩 2~3클릭으로 창연을 맞춘다 (과도하게 조이지 않음)
+          - (선택) 접착제 병용 — 도포 후 60초 경화 대기
+          - 스트랩을 짧게 다듬는다. 드레싱 테이프가 Zip 본체에 직접 닿지 않게
+          - 착용 표준 14일, 최대 30일
+        knee_tip: 무릎 정중 절개는 적용 전 45~60도 굴곡
+        competitors:
+          Prineo: { by: Ethicon, weak: [아크릴레이트 알레르기, OR 내 건조시간 7분 이상, 러닝스티치 비용 별도] }
+          Exofin Fusion: { by: Chemence, weak: [창상 폐색, 아크릴레이트 반응, 고가, 사이즈 2종뿐] }
+          Insorb: { by: Incisive, weak: [임상 근거 제한적] }
+          Steri-Strip: { by: 3M, weak: [보강용이지 폐쇄용 아님, 힘 분산 안 됨] }
+        frame: "'Prineo 대신 Zip'이 아니라 '스테이플·봉합사 대신 Zip'이 대화 프레임이어야 한다"
+        accounts: [seoul-spine, nowon-eulji]
+
+  - id: sports_medicine
+    name: 스포츠메디슨
+    depts: [OS 어깨, OS 무릎, OS 고관절, 족부]
+    items:
+      - id: iconix
+        name: ICONIX All-Suture Anchor
+        aka: [아이코닉스, ICONIX 1, ICONIX TT, ICONIX Speed, InteliBraid]
+        what: 봉합사 자체가 뼈 구멍 안에서 부풀어 고정되는 all-suture 앵커
+        diameters: [1.4mm, 2.3mm]
+        options: 총 14가지 봉합사·앵커 테이프 조합 (더블/트리플 로디드, 니들 유무, 셀프펀칭 유무)
+        materials: ["#5 봉합사", "#2 봉합사", 1.2mm 앵커 테이프, 2.0mm 앵커 테이프]
+        speed: 셀프펀칭 — 별도 드릴링 없이 앵커 배치
+        guides: [스트레이트 숏, 스트레이트, 12도, 12도 슬랜트, 25도, 25도 슬랜트, 일회용 키트]
+        indications:
+          어깨: [회전근개 봉합, 관절와순 봉합(Bankart/SLAP), 이두건 고정]
+          무릎: [반월상연골판 뿌리 봉합, 내측측부인대 보강]
+          족부: [아킬레스건 부착부, 인대 재건]
+          고관절: [관절와순 봉합]
+        three_logics:
+          - "골 보존 — 1.4mm면 재수술 여지를 남깁니다"
+          - "골질 대응 — 골다공증 상완골두에서 나사식보다 안정적입니다"
+          - "시간 — Speed는 펀칭 단계가 빠집니다"
+        competitors: [Arthrex Knotless FiberTak, CONMED Y-Knot, Smith+Nephew Q-FIX]
+        reality: |
+          Arthrex와 앵커 대 앵커 정면 승부는 하지 않는다. 국내 어깨 관절경에서 Arthrex는 사실상 표준이고
+          레지던트·펠로우 교육 단계부터 손에 익어 있다.
+          진입 경로 ①영상 타워와 묶기 ②재수술·골다공증 케이스 ③Young Surgeon
+        accounts: [sejong-sports, seoul-spine, cheongdam-lion, seoul-medical-center, guri-central, nowon-eulji]
+
+      - id: alphavent
+        name: AlphaVent
+        what: 바이오컴포지트 스크류인(나사형) 하드바디 앵커
+        pair_with: ICONIX
+        why: 골질·술자 선호에 따라 all-suture와 나뉨. 두 타입을 함께 제안하면 '손맛' 이탈 위험이 낮아짐
+        accounts: [korea-univ, seoul-medical-center, guri-central, amc]
+
+      - id: inspace
+        name: InSpace
+        what: 생분해성 견봉하 풍선 스페이서
+        indication: MIRCT — 광범위 비봉합성 회전근개 파열
+        strategic: 동등 승인 제품이 사실상 없다. 독점 카테고리는 임상적 필요성으로 판다
+        script: "봉합 가능한 파열은 보강 개념, 봉합 불가능한 파열은 공간 확보 개념"
+
+      - id: crossfire
+        name: Crossfire
+        what: 관절경 Resection 플랫폼 (셰이버·RF 통합)
+        accounts: [cheongdam-harrison, haneul, snubh]
+
+      - id: rf_probe
+        name: SERFAS RF Probe / 콘솔
+        use: 지혈과 조직 절제 (바이폴라)
+        note: 콘솔과 세트로 운용. 팁은 반복 소모품
+        accounts: [haneul, snuh, cheongdam-harrison]
+
+      - id: shaver
+        name: Shaver Cutter & Bur
+        use: 견봉성형술·활액막 제거·연골 정리
+        note: 규격·형상별 재고 필요
+        accounts: [snuh]
+
+      - id: reelx
+        name: Reelx
+        what: 앵커 계열
+        watch: "5.5mm expire 제품 회수 / 4.5mm 교체 건 존재"
+        accounts: [snubh, seongnam-medical-center]
+
+  - id: ppe
+    name: 개인보호
+    depts: [OS 인공관절]
+    items:
+      - id: t7
+        name: T7 / T7plus 서지컬 헬멧 (구 Flyte)
+        aka: [플라이트 헬멧, 플라이트 후드, Flyte Helmet]
+        why: 술자 보호(혈액매개 병원체 차단) + 환자 보호(수술부위감염 예방)
+        improvements: { 소음: 이전 모델 대비 40% 감소, 무게: Stryker 헬멧 중 최경량, 배터리: 수명 연장, 조절: 듀얼 노브 }
+        hood: T7plus 후드·토가는 통기성 신소재 + AAMI Level 4 (바이러스 침투 저항)
+        sell: |
+          본체는 내구재지만 후드·토가는 케이스마다 소모된다 = 헬멧 도입은 곧 지속 매출.
+          결정권이 집도의가 아니라 수술실 간호팀·감염관리팀·구매팀에 있는 경우가 많다.
+          착용감(무게·소음·시야·김서림)은 실물 착용 시연이 전부다.
+        accounts: [snuh, kimnjo, severance-sinchon, korea-univ]
+
+  - id: consumables_etc
+    name: 부수 품목·소모품
+    items:
+      - { id: surgiseal,  name: Surgiseal,        note: 피부 접착제 계열, accounts: [snuh] }
+      - { id: exofin,     name: Exofin (HVTA bond), note: 조직 접착제. 거래명세서 코드 예 B3340006, accounts: [seoul-jump, severance-sinchon] }
+      - { id: tubing,     name: Pump Tubing,      note: 관절경 펌프 튜브세트 — 케이스당 소진, accounts: [guri-central, snuh] }
+      - { id: tourniquet, name: 토니켓 / 토니켓 커프, accounts: [severance-sinchon] }
+      - { id: cannula,    name: 일회용 캐뉼라,     accounts: [korea-univ] }
+      - { id: vtband,     name: VT-Band,          accounts: [kimnjo] }
+      - { id: encol,      name: EN-COL (콜라겐),   accounts: [seoul-jump] }
+      - { id: ateloq,     name: Atelo Q }
+      - { id: omega,      name: OMEGA }
+      - { id: bonemill,   name: Bone Mill Blade,  accounts: [severance-sinchon] }
+      - { id: pidrive,    name: Pi Drive Motor,   accounts: [guri-central, seoul-hyundai] }
+      - { id: smartpump,  name: Smart Pump }
+      - { id: suctionmat, name: 석션매트 }
+      - { id: aitrics,    name: AI Trics }
+      - { id: arthrocare, name: Arthrocare Tip,   accounts: [haneul] }
+
+# 관절경 케이스 커버 7축 — 하나라도 비면 수술이 멈춘다
+case_cover_axes:
+  - { axis: 카메라, items: [1788/1688 플랫폼, 카메라 헤드, 커플러, 카메라 드레이프] }
+  - { axis: 빛,     items: [L11 광원, 광케이블], spare: 예비 광케이블 반드시 동행 }
+  - { axis: 물,     items: [펌프 튜브세트, 관류액] }
+  - { axis: 칼,     items: [셰이버 블레이드, 버] }
+  - { axis: 에너지, items: [RF 프로브·팁] }
+  - { axis: 고정,   items: [ICONIX 앵커, 고강도 봉합사, InSpace] }
+  - { axis: 봉합,   items: [Zip, 드레싱] }

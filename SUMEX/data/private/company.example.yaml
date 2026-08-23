@@ -1,0 +1,10 @@
+company:
+  ceo: 대표자명
+  biz_no: 000-00-00000
+  address: 서울특별시 ...
+  bank_account: "○○은행 000-000-000000"
+rep:
+  name: 담당자명
+  title: 대리
+  phone: "010-0000-0000"
+  email: someone@example.com

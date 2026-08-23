@@ -1,0 +1,4 @@
+# 품목별 단가·상한금액. 고시 개정으로 계속 바뀌므로 공개 저장소에 두지 않는다.
+# sumex doc --items 에서 단가를 생략했을 때 참고용으로 쓸 수 있다.
+pricing:
+  - { product: iconix, code: "", name: "ICONIX 1.7T", price: 0, ceiling: 0, updated: 2026-08-14 }
