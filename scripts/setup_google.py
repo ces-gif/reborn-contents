@@ -28,6 +28,7 @@ CREDENTIALS_URL = "https://console.cloud.google.com/apis/credentials"
 DRIVE_API_URL = "https://console.cloud.google.com/apis/library/drive.googleapis.com"
 
 OUT_FILE = Path("google-secrets.txt")
+LOG_FILE = Path("setup-log.txt")
 
 
 def _init_console() -> None:
@@ -121,10 +122,63 @@ def step_client() -> tuple[str, str]:
     return client_id, client_secret
 
 
+def _client_config(client_id: str, client_secret: str) -> dict:
+    return {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": ["http://localhost"],
+        }
+    }
+
+
+def _show_url(url: str) -> None:
+    say()
+    say("-" * 68)
+    say("아래 주소를 브라우저 주소창에 복사해서 붙여넣으세요:")
+    say("-" * 68)
+    say(url)
+    say("-" * 68)
+    say()
+    say("  복사하는 법: 위 주소를 마우스로 드래그해서 선택 → Enter (복사됨)")
+    say("               브라우저 주소창에 Ctrl+V 로 붙여넣고 Enter")
+    say()
+
+
+def _manual_flow(config: dict):
+    """브라우저 자동 실행이나 로컬 서버가 안 될 때 쓰는 수동 방식.
+
+    구글이 http://localhost 로 돌려보내면 '페이지를 열 수 없음' 이 뜨는데,
+    그때 **주소창의 주소 전체**를 복사해 오면 된다. 그 안에 인증 코드가 들어 있다.
+    """
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    flow = InstalledAppFlow.from_client_config(config, SCOPES)
+    flow.redirect_uri = "http://localhost:8080/"
+    url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+
+    say()
+    say("  자동으로 창이 안 열려서 수동으로 진행합니다. 어렵지 않습니다.")
+    _show_url(url)
+    say("  로그인하고 [계속] 을 누르면 브라우저가")
+    say("  'localhost 에서 연결을 거부했습니다' 같은 빈 페이지로 갑니다. 정상입니다!")
+    say("  그 상태에서 **주소창의 주소 전체**를 복사해서 아래에 붙여넣어 주세요.")
+    say("  (http://localhost:8080/?code=... 로 시작하는 긴 주소)")
+    say()
+
+    pasted = input("  주소 붙여넣기: ").strip()
+    if not pasted.startswith("http"):
+        raise RuntimeError("주소가 올바르지 않습니다. http://localhost:8080/?code=... 형태여야 합니다.")
+    flow.fetch_token(authorization_response=pasted)
+    return flow.credentials
+
+
 def step_authorize(client_id: str, client_secret: str) -> str:
     rule("4/4 · 구글 로그인해서 권한 주기")
     say("브라우저가 열립니다. 리본마켓 드라이브를 쓰는 계정(ces@rebornmarket.org)으로")
-    say("로그인하고 [허용] 을 눌러주세요.")
+    say("로그인하고 [계속] 을 눌러주세요.")
     say()
     say("  * '이 앱은 확인되지 않았습니다' 가 나오면")
     say("    [고급] → [(안전하지 않음) 이동] 을 누르시면 됩니다.")
@@ -133,26 +187,33 @@ def step_authorize(client_id: str, client_secret: str) -> str:
 
     from google_auth_oauthlib.flow import InstalledAppFlow
 
-    flow = InstalledAppFlow.from_client_config(
-        {
-            "installed": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["http://localhost"],
-            }
-        },
-        SCOPES,
-    )
-    # access_type=offline + prompt=consent 라야 리프레시 토큰이 나온다
-    creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
+    config = _client_config(client_id, client_secret)
+    creds = None
+    try:
+        flow = InstalledAppFlow.from_client_config(config, SCOPES)
+        say()
+        say("  브라우저를 여는 중입니다... (창이 뒤에 숨어 있을 수 있으니 Alt+Tab 확인)")
+        say("  창이 안 뜨면 아래에 주소가 나옵니다. 그걸 복사해서 여세요.")
+        creds = flow.run_local_server(
+            port=0,
+            access_type="offline",
+            prompt="consent",
+            authorization_prompt_message="\n주소: {url}\n",
+            success_message="인증 완료! 이 창을 닫고 검은 마법사 창으로 돌아가세요.",
+            open_browser=True,
+        )
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:
+        say()
+        say(f"  자동 로그인이 안 됐습니다: {exc}")
+        creds = _manual_flow(config)
 
-    if not creds.refresh_token:
+    if not creds or not creds.refresh_token:
         say()
         say("  ✗ 리프레시 토큰을 받지 못했습니다.")
         say("    https://myaccount.google.com/permissions 에서 방금 만든 앱 권한을 지우고")
-        say("    이 스크립트를 다시 실행해 주세요.")
+        say("    이 마법사를 다시 실행해 주세요.")
         raise SystemExit(1)
     return creds.refresh_token
 
@@ -262,9 +323,36 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def _hold(code: int) -> int:
+    """무슨 일이 있어도 창이 그냥 닫히지 않게 붙잡는다."""
+    say()
+    say("=" * 68)
     try:
-        raise SystemExit(main())
+        input("  이 창을 닫으려면 Enter 를 누르세요. ")
+    except Exception:
+        pass
+    return code
+
+
+if __name__ == "__main__":
+    import traceback
+
+    try:
+        _code = main()
     except KeyboardInterrupt:
         say("\n중단했습니다.")
-        raise SystemExit(130)
+        _code = 130
+    except SystemExit as exc:
+        _code = int(exc.code or 0)
+    except Exception:
+        say()
+        say("  ✗ 예상하지 못한 오류가 났습니다. 아래 내용을 그대로 알려주시면 고쳐드립니다.")
+        say()
+        say(traceback.format_exc())
+        try:
+            LOG_FILE.write_text(traceback.format_exc(), encoding="utf-8")
+            say(f"  같은 내용을 {LOG_FILE.resolve()} 에도 저장했습니다.")
+        except Exception:
+            pass
+        _code = 1
+    raise SystemExit(_hold(_code))
