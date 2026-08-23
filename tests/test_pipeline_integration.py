@@ -1,0 +1,194 @@
+"""드라이브와 모델을 가짜로 갈아끼우고 파이프라인 전체를 한 번 돌려본다."""
+
+from __future__ import annotations
+
+import json
+from datetime import date, datetime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from PIL import Image
+
+from reborn import branding, pipeline
+from reborn.config import load_settings
+from reborn.drive import DriveFile
+
+
+class FakeDrive:
+    def __init__(self, files, photo_bytes, logo_bytes):
+        self.files = files
+        self.photo_bytes = photo_bytes
+        self.logo_bytes = logo_bytes
+        self.folders: dict[tuple[str | None, str], str] = {}
+        self.uploaded: dict[str, bytes] = {}
+
+    def list_children(self, folder_id, only_images=False, page_size=200):
+        return list(self.files)
+
+    def get_parent(self, file_id):
+        return "PARENT"
+
+    def ensure_folder(self, name, parent_id=None):
+        key = (parent_id, name)
+        return self.folders.setdefault(key, f"folder-{len(self.folders)}-{name}")
+
+    def find_child(self, parent_id, name, mime_type=None):
+        return None
+
+    def download(self, file_id, dest: Path):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(self.logo_bytes if file_id == "LOGO" else self.photo_bytes)
+        return dest
+
+    def upload(self, path: Path, parent_id, mime_type=None, name=None):
+        self.uploaded[name or path.name] = path.read_bytes()
+        return f"file-{name or path.name}"
+
+
+def _block(name, payload):
+    return SimpleNamespace(type="tool_use", name=name, input=payload)
+
+
+class FakeAnthropic:
+    """도구 이름에 따라 미리 정해진 응답을 돌려준다."""
+
+    def __init__(self):
+        self.calls: list[str] = []
+        self.messages = SimpleNamespace(create=self._create)
+
+    def _create(self, **kwargs):
+        tool = kwargs["tool_choice"]["name"]
+        self.calls.append(tool)
+        if tool == "extract_product":
+            n = len([c for c in kwargs["messages"][0]["content"] if c["type"] == "image"])
+            idx = len([c for c in self.calls if c == "extract_product"])
+            return SimpleNamespace(content=[_block(tool, {
+                "is_product": True,
+                "product_name": f"쿠쿠 {idx}호 밥솥",
+                "one_liner": "박스만 개봉한 미사용품",
+                "category": "가전",
+                "original_price": 200000 + idx * 1000,
+                "sale_price": 100000,
+                "discount_pct": None,
+                "price_source": f"{n}번 사진 가격표",
+                "best_photo_index": 1,
+                "appeal": "혼수 수요가 많습니다",
+                "needs_review": False,
+                "review_reason": "",
+            })])
+        if tool == "pick_best":
+            return SimpleNamespace(content=[_block(tool, {
+                "ranking": [{"id": 0, "why": "할인 폭이 큽니다"}]
+            })])
+        if tool == "write_post":
+            return SimpleNamespace(content=[_block(tool, {
+                "category_tag": "오늘의 리본 특가",
+                "title": "평택 리퍼브 가전 BEST",
+                "intro": [["안녕하세요.", "리본마켓 평택점입니다."]],
+                "transition": ["그래서 오늘은 준비했어요."],
+                "items": [{"heading": "첫 번째 상품", "body": [["본문", "두 줄"]],
+                           "personal_note": "저는 이렇게 쓰곤 해요."}],
+                "table_intro": "한눈에 보시라고 정리했어요.",
+                "table_wrapup": ["표에서 보시다시피 반값입니다."],
+                "closing": [["오늘도 좋은 하루 되세요."]],
+                "tags": ["리본마켓", "평택리퍼브"],
+            })])
+        raise AssertionError(f"예상 못 한 도구: {tool}")
+
+
+@pytest.fixture
+def wired(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    Image.new("RGB", (1600, 1200), (230, 232, 238)).save(photo)
+    logo = tmp_path / "logo.png"
+    Image.new("RGBA", (600, 160), (253, 111, 35, 255)).save(logo)
+
+    def f(name, iso):
+        dt = datetime.fromisoformat(iso).astimezone(timezone.utc)
+        return DriveFile(id=name, name=name, mime_type="image/jpeg",
+                         created_time=dt, modified_time=dt, size=100)
+
+    files = [
+        f("20260823_104712.jpg", "2026-08-23T10:47:12+09:00"),
+        f("20260823_104733.jpg", "2026-08-23T10:47:33+09:00"),  # 같은 상품
+        f("20260823_105300.jpg", "2026-08-23T10:53:00+09:00"),  # 다른 상품
+        f("20260822_180000.jpg", "2026-08-22T18:00:00+09:00"),  # 어제분 → 제외
+    ]
+    drive = FakeDrive(files, photo.read_bytes(), logo.read_bytes())
+    client = FakeAnthropic()
+
+    monkeypatch.setattr(pipeline, "Drive", lambda *a, **k: drive)
+    monkeypatch.setattr(pipeline, "anthropic_client", lambda s: client)
+    monkeypatch.setattr(branding, "LOGO_CACHE", tmp_path / "cache-logo.png")
+    monkeypatch.setenv(branding.LOGO_ENV_PATH, str(logo))
+    return drive, client, tmp_path
+
+
+def test_full_run_produces_cards_blog_social_and_uploads(wired):
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+
+    result = pipeline.run(
+        settings,
+        day=date(2026, 8, 23),
+        out_root=tmp_path / "out",
+        work_root=tmp_path / "work",
+    )
+
+    # 어제 사진은 빠지고, 오늘 3장이 상품 2개로 묶였다
+    assert result.photos_seen == 3
+    assert result.groups == 2
+    assert len(result.cards) == 2
+
+    for card in result.cards:
+        with Image.open(card) as img:
+            assert img.size == (1080, 1920)
+
+    day_dir = tmp_path / "out" / "2026-08-23"
+    assert list((day_dir / "블로그").glob("2026-08-23-best*-blog.html"))
+    assert list((day_dir / "블로그").glob("2026-08-23-best*-blog.md"))
+    assert (day_dir / "소셜" / "2026-08-23-카톡공지.txt").exists()
+    assert (day_dir / "소셜" / "2026-08-23-인스타캡션.txt").exists()
+
+    products = json.loads((day_dir / "_data" / "products.json").read_text(encoding="utf-8"))
+    assert len(products) == 2 and products[0]["publishable"]
+
+    # 드라이브에 카드/블로그/공지가 다 올라갔고 원장도 갱신됐다
+    assert any(n.endswith(".png") for n in result.uploaded)
+    assert "_ledger.json" in drive.uploaded
+    ledger = json.loads(drive.uploaded["_ledger.json"].decode("utf-8"))
+    assert len(ledger["processed_file_ids"]) == 3
+
+
+def test_second_run_skips_already_processed_photos(wired):
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+    kwargs = dict(day=date(2026, 8, 23), out_root=tmp_path / "out", work_root=tmp_path / "work")
+
+    pipeline.run(settings, **kwargs)
+    # 원장이 드라이브에 올라갔으니 다음 실행에서 그대로 읽힌다
+    drive.find_child = lambda parent, name, mime_type=None: (
+        "LEDGER" if name == "_ledger.json" else None
+    )
+    original_download = drive.download
+
+    def download(file_id, dest):
+        if file_id == "LEDGER":
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(drive.uploaded["_ledger.json"])
+            return dest
+        return original_download(file_id, dest)
+
+    drive.download = download
+
+    again = pipeline.run(settings, **kwargs)
+    assert again.photos_seen == 0
+    assert again.skipped_reason
+
+
+def test_slugify_keeps_korean_and_strips_symbols():
+    assert pipeline.slugify("삼성 비스포크 큐브 에어 (전시품)") == "삼성-비스포크-큐브-에어-전시품"
+    assert pipeline.slugify("") == "상품"

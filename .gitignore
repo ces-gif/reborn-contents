@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+out/
+work/
+.cache/
+assets/reborn_logo.png
+*.egg-info/
+.pytest_cache/

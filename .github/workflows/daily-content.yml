@@ -1,0 +1,77 @@
+name: 매일 카드뉴스 + BEST5 블로그
+
+# 매일 한국시간 오후 6시(18:00 KST = 09:00 UTC)에 자동 실행된다.
+# 깃허브 서버에서 도는 작업이라 은성님 컴퓨터가 꺼져 있어도 그대로 실행된다.
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "처리할 날짜 (YYYY-MM-DD, 비우면 오늘)"
+        required: false
+        type: string
+      dry_run:
+        description: "드라이브 업로드/알림 없이 만들어만 보기"
+        required: false
+        type: boolean
+        default: false
+      reprocess:
+        description: "이미 처리한 사진도 다시 처리"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: reborn-daily
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: 콘텐츠 생성 및 발행
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
+          # 설정값을 저장소 수정 없이 바꾸고 싶을 때만 리포지토리 Variables 로 지정한다.
+          SOURCE_FOLDER_ID: ${{ vars.SOURCE_FOLDER_ID }}
+          PUBLISH_FOLDER_NAME: ${{ vars.PUBLISH_FOLDER_NAME }}
+          PUBLISH_PARENT_ID: ${{ vars.PUBLISH_PARENT_ID }}
+          LOGO_FILE_ID: ${{ vars.LOGO_FILE_ID }}
+          STORE_NAME: ${{ vars.STORE_NAME }}
+          MAX_CARDS_PER_DAY: ${{ vars.MAX_CARDS_PER_DAY }}
+        run: |
+          python scripts/run_daily.py \
+            ${{ inputs.date && format('--date {0}', inputs.date) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            ${{ inputs.reprocess && '--reprocess' || '' }}
+
+      - name: 생성물 아티팩트로 보관 (2주)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reborn-contents-${{ github.run_number }}
+          path: out/
+          retention-days: 14
+          if-no-files-found: ignore
