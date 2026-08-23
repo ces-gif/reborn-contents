@@ -1,10 +1,11 @@
-name: 매일 카드뉴스 + BEST5 블로그
+name: 매일 카드뉴스 + BEST5 블로그 + 인스타 스토리
 
-# 매일 한국시간 오후 6시(18:00 KST = 09:00 UTC)에 자동 실행된다.
+# 매일 한국시간 낮 12시(12:00 KST = 03:00 UTC)에 자동 실행된다.
+# 오전 11:30까지 드라이브에 올린 사진이 대상이다.
 # 깃허브 서버에서 도는 작업이라 은성님 컴퓨터가 꺼져 있어도 그대로 실행된다.
 on:
   schedule:
-    - cron: "0 9 * * *"
+    - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
       date:
@@ -54,13 +55,23 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
+          # 인스타그램 스토리 자동 게시
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          # 카드뉴스를 공개 URL 로 올릴 곳 (인스타는 공개 URL 만 받는다)
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
           # 설정값을 저장소 수정 없이 바꾸고 싶을 때만 리포지토리 Variables 로 지정한다.
-          SOURCE_FOLDER_ID: ${{ vars.SOURCE_FOLDER_ID }}
           PUBLISH_FOLDER_NAME: ${{ vars.PUBLISH_FOLDER_NAME }}
           PUBLISH_PARENT_ID: ${{ vars.PUBLISH_PARENT_ID }}
           LOGO_FILE_ID: ${{ vars.LOGO_FILE_ID }}
           STORE_NAME: ${{ vars.STORE_NAME }}
           MAX_CARDS_PER_DAY: ${{ vars.MAX_CARDS_PER_DAY }}
+          INSTAGRAM_ENABLED: ${{ vars.INSTAGRAM_ENABLED }}
+          MAX_STORIES_PER_DAY: ${{ vars.MAX_STORIES_PER_DAY }}
         run: |
           python scripts/run_daily.py \
             ${{ inputs.date && format('--date {0}', inputs.date) || '' }} \

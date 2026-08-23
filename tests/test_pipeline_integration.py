@@ -16,15 +16,15 @@ from reborn.drive import DriveFile
 
 
 class FakeDrive:
-    def __init__(self, files, photo_bytes, logo_bytes):
-        self.files = files
+    def __init__(self, files_by_folder, photo_bytes, logo_bytes):
+        self.files_by_folder = files_by_folder
         self.photo_bytes = photo_bytes
         self.logo_bytes = logo_bytes
         self.folders: dict[tuple[str | None, str], str] = {}
         self.uploaded: dict[str, bytes] = {}
 
     def list_children(self, folder_id, only_images=False, page_size=200):
-        return list(self.files)
+        return list(self.files_by_folder.get(folder_id, []))
 
     def get_parent(self, file_id):
         return "PARENT"
@@ -154,13 +154,21 @@ def wired(tmp_path, monkeypatch):
         return DriveFile(id=name, name=name, mime_type="image/jpeg",
                          created_time=dt, modified_time=dt, size=100)
 
-    files = [
-        f("20260823_104712.jpg", "2026-08-23T10:47:12+09:00"),
-        f("20260823_104733.jpg", "2026-08-23T10:47:33+09:00"),  # 같은 상품
-        f("20260823_105300.jpg", "2026-08-23T10:53:00+09:00"),  # 다른 상품
-        f("20260822_180000.jpg", "2026-08-22T18:00:00+09:00"),  # 어제분 → 제외
-    ]
-    drive = FakeDrive(files, photo.read_bytes(), logo.read_bytes())
+    settings = load_settings()
+    refurb_id = settings.sources[0].folder_id
+    new_id = settings.sources[1].folder_id
+    files_by_folder = {
+        refurb_id: [
+            f("20260823_104712.jpg", "2026-08-23T10:47:12+09:00"),
+            f("20260823_104733.jpg", "2026-08-23T10:47:33+09:00"),  # 같은 상품
+            f("20260823_105300.jpg", "2026-08-23T10:53:00+09:00"),  # 다른 상품
+            f("20260822_180000.jpg", "2026-08-22T18:00:00+09:00"),  # 어제분 → 제외
+        ],
+        new_id: [
+            f("20260823_111000.jpg", "2026-08-23T11:10:00+09:00"),  # 새상품 1개
+        ],
+    }
+    drive = FakeDrive(files_by_folder, photo.read_bytes(), logo.read_bytes())
     client = FakeAnthropic()
 
     monkeypatch.setattr(pipeline, "Drive", lambda *a, **k: drive)
@@ -182,10 +190,11 @@ def test_full_run_produces_cards_blog_social_and_uploads(wired):
         work_root=tmp_path / "work",
     )
 
-    # 어제 사진은 빠지고, 오늘 3장이 상품 2개로 묶였다
-    assert result.photos_seen == 3
-    assert result.groups == 2
-    assert len(result.cards) == 2
+    # 어제 사진은 빠지고, 리퍼 3장(상품 2개) + 새상품 1장(상품 1개)
+    assert result.photos_seen == 4
+    assert result.per_source == {"리퍼": 3, "새상품": 1}
+    assert result.groups == 3
+    assert len(result.cards) == 3
 
     for card in result.cards:
         with Image.open(card) as img:
@@ -198,13 +207,13 @@ def test_full_run_produces_cards_blog_social_and_uploads(wired):
     assert (day_dir / "소셜" / "2026-08-23-인스타캡션.txt").exists()
 
     products = json.loads((day_dir / "_data" / "products.json").read_text(encoding="utf-8"))
-    assert len(products) == 2 and products[0]["publishable"]
+    assert len(products) == 3 and products[0]["publishable"]
 
     # 드라이브에 카드/블로그/공지가 다 올라갔고 원장도 갱신됐다
     assert any(n.endswith(".png") for n in result.uploaded)
     assert "_ledger.json" in drive.uploaded
     ledger = json.loads(drive.uploaded["_ledger.json"].decode("utf-8"))
-    assert len(ledger["processed_file_ids"]) == 3
+    assert len(ledger["processed_file_ids"]) == 4
 
 
 def test_second_run_skips_already_processed_photos(wired):
@@ -243,7 +252,7 @@ def test_price_tag_only_group_makes_no_card_but_is_reported(wired, monkeypatch):
     """은성님 지시: 가격표만 찍힌 건 정보 전달용이라 카드뉴스를 만들지 않는다."""
     drive, client, tmp_path = wired
     # 1번 묶음은 가격표만, 2번 묶음은 가격표 + 상품
-    client.kinds_per_group = [["price_tag", "price_tag"], ["price_tag"]]
+    client.kinds_per_group = [["price_tag", "price_tag"], ["price_tag"], ["price_tag"]]
 
     settings = load_settings()
     settings.logo_file_id = "LOGO"
@@ -252,9 +261,9 @@ def test_price_tag_only_group_makes_no_card_but_is_reported(wired, monkeypatch):
         out_root=tmp_path / "out", work_root=tmp_path / "work",
     )
 
-    assert result.groups == 2
+    assert result.groups == 3
     assert result.cards == []
-    assert len(result.needs_review) == 2
+    assert len(result.needs_review) == 3
     assert all("가격표만" in p.review_reason for p in result.needs_review)
 
     report = (tmp_path / "out" / "2026-08-23" / "_data" / "리포트.md").read_text(encoding="utf-8")
@@ -294,5 +303,58 @@ def test_research_failure_does_not_stop_publishing(wired, monkeypatch):
         out_root=tmp_path / "out", work_root=tmp_path / "work",
     )
 
-    assert len(result.cards) == 2
+    assert len(result.cards) == 3
     assert all(not p.research_matched and p.card_line == "" for p in result.published)
+
+
+def test_new_goods_folder_gets_its_own_wording_and_folder(wired):
+    """새상품 폴더는 제조사 직거래 미개봉 새상품이라 눈썹 문구가 다르다."""
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+
+    result = pipeline.run(
+        settings, day=date(2026, 8, 23),
+        out_root=tmp_path / "out", work_root=tmp_path / "work",
+    )
+
+    by_source = {p.source_name: p for p in result.published}
+    assert by_source["리퍼"].eyebrow == "오늘의 리본 특가"
+    assert by_source["새상품"].eyebrow == "제조사 직거래 새상품"
+    assert by_source["새상품"].is_new_goods
+
+    cards = tmp_path / "out" / "2026-08-23" / "카드뉴스"
+    assert list((cards / "리퍼").glob("*.png"))
+    assert list((cards / "새상품").glob("*.png"))
+
+
+def test_new_goods_may_say_it_is_new_but_refurb_may_not(wired):
+    """새상품은 폴더 자체가 근거라 '미개봉 새상품'을 쓸 수 있고, 리퍼는 가격표 근거가 필요하다."""
+    from reborn.vision import Product, sanity_check
+
+    def make(kind):
+        return sanity_check(Product(
+            product_name="테스트", category="가전", tag_text="정가 100,000",
+            condition_note="미개봉 새상품입니다", original_price=100000, sale_price=50000,
+            photo_kinds=["both"], photo_paths=["a.jpg"], best_photo_index=1, source_kind=kind,
+        ))
+
+    assert make("new").condition_note == "미개봉 새상품입니다"
+    assert make("refurb").condition_note == ""
+
+
+def test_instagram_is_skipped_cleanly_without_credentials(wired):
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+
+    result = pipeline.run(
+        settings, day=date(2026, 8, 23),
+        out_root=tmp_path / "out", work_root=tmp_path / "work",
+    )
+
+    assert result.stories is not None
+    assert result.stories.skipped_reason
+    assert result.stories.results == []
+    # 인스타가 안 되더라도 나머지 발행은 다 끝나 있어야 한다
+    assert result.cards and result.drive_folder_url

@@ -22,6 +22,13 @@ def _env(name: str, default: Any = None) -> Any:
     return value
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = _env(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in ("1", "true", "yes", "on", "y")
+
+
 def _env_int(name: str, default: int) -> int:
     raw = _env(name)
     if raw is None:
@@ -33,8 +40,22 @@ def _env_int(name: str, default: int) -> int:
 
 
 @dataclass
+class Source:
+    """상품 사진이 올라오는 드라이브 폴더 하나."""
+
+    name: str
+    folder_id: str
+    kind: str = "refurb"  # refurb = 검수된 리퍼브, new = 제조사 직거래 새상품
+    eyebrow: str = "오늘의 리본 특가"
+
+    @property
+    def is_new_goods(self) -> bool:
+        return self.kind == "new"
+
+
+@dataclass
 class Settings:
-    source_folder_id: str
+    sources: list[Source]
     publish_folder_name: str
     publish_parent_id: str
     logo_file_id: str
@@ -61,9 +82,23 @@ class Settings:
 
     best_count: int
 
+    instagram_enabled: bool
+    max_stories_per_day: int
+    story_delay_seconds: int
+
     raw: dict = field(default_factory=dict, repr=False)
 
     # --- 비밀값 (환경변수 전용, 파일에 절대 저장하지 않는다) ---
+    @property
+    def source_folder_ids(self) -> list[str]:
+        return [s.folder_id for s in self.sources]
+
+    def source_for(self, folder_id: str) -> Source:
+        for source in self.sources:
+            if source.folder_id == folder_id:
+                return source
+        return self.sources[0]
+
     @property
     def anthropic_api_key(self) -> str | None:
         return _env("ANTHROPIC_API_KEY")
@@ -98,9 +133,10 @@ def load_settings(path: Path | str | None = None) -> Settings:
     store = data.get("store", {}) or {}
     card = data.get("card", {}) or {}
     blog = data.get("blog", {}) or {}
+    instagram = data.get("instagram", {}) or {}
 
     return Settings(
-        source_folder_id=_env("SOURCE_FOLDER_ID", drive.get("source_folder_id", "")),
+        sources=_load_sources(drive),
         publish_folder_name=_env(
             "PUBLISH_FOLDER_NAME", drive.get("publish_folder_name", "콘텐츠 발행")
         ),
@@ -124,5 +160,41 @@ def load_settings(path: Path | str | None = None) -> Settings:
         orig_label=_env("ORIG_LABEL", card.get("orig_label", "온라인 판매가")),
         sale_label=_env("SALE_LABEL", card.get("sale_label", "리본마켓 초특가")),
         best_count=_env_int("BEST_COUNT", int(blog.get("best_count", 5))),
+        instagram_enabled=_env_bool("INSTAGRAM_ENABLED", bool(instagram.get("enabled", True))),
+        max_stories_per_day=_env_int(
+            "MAX_STORIES_PER_DAY", int(instagram.get("max_stories_per_day", 10))
+        ),
+        story_delay_seconds=_env_int(
+            "STORY_DELAY_SECONDS", int(instagram.get("delay_between_seconds", 20))
+        ),
         raw=data,
     )
+
+
+def _load_sources(drive: dict) -> list[Source]:
+    """설정의 sources 목록을 읽는다.
+
+    SOURCE_FOLDER_ID 환경변수가 있으면 그 폴더 하나만 쓴다 (특정 폴더만 급히 돌릴 때).
+    """
+    override = _env("SOURCE_FOLDER_ID")
+    if override:
+        return [Source(name="지정 폴더", folder_id=override)]
+
+    raw_sources = drive.get("sources") or []
+    sources = [
+        Source(
+            name=item.get("name", "상품"),
+            folder_id=item["folder_id"],
+            kind=item.get("kind", "refurb"),
+            eyebrow=item.get("eyebrow", "오늘의 리본 특가"),
+        )
+        for item in raw_sources
+        if item.get("folder_id")
+    ]
+    if sources:
+        return sources
+    # 예전 설정 형식(단일 폴더)도 계속 받아준다
+    legacy = drive.get("source_folder_id")
+    if legacy:
+        return [Source(name="상품", folder_id=legacy)]
+    raise ValueError("설정에 상품 사진 폴더(drive.sources)가 없습니다")

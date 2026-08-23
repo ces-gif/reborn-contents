@@ -129,8 +129,22 @@ SYSTEM = """당신은 리본마켓 평택점의 콘텐츠 담당자입니다.
 7. 상품명은 가격표 표기를 우선합니다. 가격표에 없으면 사진 속 제품의 브랜드/로고/모델명으로 씁니다."""
 
 USER_TEMPLATE = """아래는 같은 상품을 찍은 사진 {n}장입니다 (1번부터 순서대로).
+{source_note}
 사진마다 가격표인지 상품인지 구분하고, 가격표에 적힌 상품명과 가격을 그대로 읽어주세요.
 가격표에 없는 상품 상태는 적지 마세요."""
+
+SOURCE_NOTES = {
+    "refurb": (
+        "이 상품은 '리퍼' 코너 상품입니다 — 검수를 마친 리퍼브 상품입니다.\n"
+        "상품 상태(전시상품, 단순 개봉 등)는 가격표에 적혀 있을 때만 옮겨 적으세요."
+    ),
+    "new": (
+        "이 상품은 '새상품' 코너 상품입니다 — 제조사와 직접 거래해 들여온 "
+        "미개봉 새 제품을 초저가로 파는 코너입니다.\n"
+        "따라서 '새상품'이라는 사실은 근거가 있습니다. 다만 그 외의 상태 표현"
+        "(전시, 반품, 스크래치 등)은 가격표에 적혀 있을 때만 쓰세요."
+    ),
+}
 
 
 @dataclass
@@ -161,7 +175,28 @@ class Product:
     source_file_ids: list[str] = field(default_factory=list)
     group_index: int = 0
 
+    # 어느 폴더에서 온 상품인가 (리퍼 / 새상품)
+    source_name: str = "상품"
+    source_kind: str = "refurb"
+    eyebrow: str = "오늘의 리본 특가"
+
     # ------------------------------------------------------------------ 파생
+
+    @property
+    def is_new_goods(self) -> bool:
+        """제조사와 직거래한 미개봉 새상품 폴더에서 온 상품인가."""
+        return self.source_kind == "new"
+
+    @property
+    def evidence_text(self) -> str:
+        """상태 표현을 써도 되는지 판단할 때 쓰는 근거 텍스트.
+
+        새상품 폴더는 폴더 자체가 '제조사 직거래 미개봉 새상품'이라는 근거다.
+        리퍼 폴더는 가격표에 적힌 것만 근거가 된다.
+        """
+        if self.is_new_goods:
+            return f"{self.tag_text} 새상품 새 제품 미개봉 정품"
+        return self.tag_text
 
     @property
     def has_product_photo(self) -> bool:
@@ -223,13 +258,29 @@ def encode_image(path: Path) -> dict:
 
 
 def extract_product(
-    client, photo_paths: list[Path], *, model: str, group_index: int = 0, source_file_ids=None
+    client,
+    photo_paths: list[Path],
+    *,
+    model: str,
+    group_index: int = 0,
+    source_file_ids=None,
+    source_name: str = "상품",
+    source_kind: str = "refurb",
+    eyebrow: str = "오늘의 리본 특가",
 ) -> Product:
     content: list[dict] = []
     for i, path in enumerate(photo_paths, start=1):
         content.append({"type": "text", "text": f"[{i}번 사진]"})
         content.append(encode_image(path))
-    content.append({"type": "text", "text": USER_TEMPLATE.format(n=len(photo_paths))})
+    content.append(
+        {
+            "type": "text",
+            "text": USER_TEMPLATE.format(
+                n=len(photo_paths),
+                source_note=SOURCE_NOTES.get(source_kind, SOURCE_NOTES["refurb"]),
+            ),
+        }
+    )
 
     response = client.messages.parse(
         model=model,
@@ -260,6 +311,9 @@ def extract_product(
         photo_paths=[str(p) for p in photo_paths],
         source_file_ids=list(source_file_ids or []),
         group_index=group_index,
+        source_name=source_name,
+        source_kind=source_kind,
+        eyebrow=eyebrow,
     )
     return sanity_check(product)
 
@@ -320,7 +374,7 @@ def sanity_check(p: Product) -> Product:
         reasons.append(f"할인율이 비정상입니다({pct}%)")
 
     # 가격표에 근거 없는 상태 표현은 걷어낸다
-    p.condition_note = strip_unevidenced_claims(p.condition_note, p.tag_text)
+    p.condition_note = strip_unevidenced_claims(p.condition_note, p.evidence_text)
 
     for attr in ("product_name", "condition_note", "spec_line", "description"):
         value = getattr(p, attr) or ""
