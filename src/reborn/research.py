@@ -13,19 +13,10 @@ import logging
 
 from pydantic import BaseModel, Field
 
+from .llm import LLMClient, LLMError, text_part
 from .vision import Product, strip_unevidenced_claims
 
 log = logging.getLogger(__name__)
-
-# 최신 web_search 서버 도구 (Opus 5 / Sonnet 5 계열에서 사용 가능)
-WEB_SEARCH_TOOL = {
-    "type": "web_search_20260209",
-    "name": "web_search",
-    "max_uses": 3,
-    "user_location": {"type": "approximate", "country": "KR", "timezone": "Asia/Seoul"},
-}
-MAX_PAUSE_TURNS = 4
-
 
 class Research(BaseModel):
     matched: bool = Field(
@@ -71,32 +62,11 @@ SYSTEM = """당신은 리본마켓 평택점의 콘텐츠 담당자입니다.
    확실하지 않으면 matched=false 입니다."""
 
 
-def _collect_search_result(client, *, model: str, messages: list[dict]):
-    """web_search 는 pause_turn 으로 끊길 수 있어서 이어서 호출한다."""
-    for _ in range(MAX_PAUSE_TURNS):
-        response = client.messages.parse(
-            model=model,
-            max_tokens=8000,
-            system=SYSTEM,
-            tools=[WEB_SEARCH_TOOL],
-            output_format=Research,
-            messages=messages,
-        )
-        if response.stop_reason != "pause_turn":
-            return response
-        messages = messages + [{"role": "assistant", "content": response.content}]
-    log.warning("web_search 가 %d번 이어서도 안 끝나 중단합니다", MAX_PAUSE_TURNS)
-    return None
-
-
-def research_product(client, product: Product, *, model: str) -> Product:
+def research_product(client: LLMClient, product: Product, *, model: str) -> Product:
     """상품에 spec_line / description / key_points / sources 를 채워 넣는다.
 
     검색이 실패하거나 제품을 특정하지 못하면 아무것도 채우지 않고 그대로 돌려준다.
     """
-    query_bits = [product.product_name]
-    if product.category:
-        query_bits.append(product.category)
     prompt = (
         f"매장 가격표에서 읽은 상품명: {product.product_name}\n"
         f"분류: {product.category}\n"
@@ -107,26 +77,27 @@ def research_product(client, product: Product, *, model: str) -> Product:
     )
 
     try:
-        response = _collect_search_result(
-            client, model=model, messages=[{"role": "user", "content": prompt}]
+        result: Research = client.structured(
+            system=SYSTEM,
+            parts=[text_part(prompt)],
+            schema=Research,
+            max_tokens=8000,
+            search=True,
+            model=model,
         )
-    except Exception as exc:  # 검색 실패로 하루치 발행을 멈추지 않는다
+    except (LLMError, Exception) as exc:  # 검색 실패로 하루치 발행을 멈추지 않는다
         log.warning("'%s' 웹 검색 실패(설명 없이 진행): %s", product.product_name, exc)
         return product
 
-    if response is None:
-        return product
-
-    result: Research = response.parsed_output
     if not result.matched:
         log.info("'%s' 은(는) 검색으로 특정하지 못해 설명을 붙이지 않습니다", product.product_name)
         return product
 
     # 검색 결과에도 상태 표현이 섞여 들어올 수 있으니 한 번 더 걷어낸다.
-    product.spec_line = strip_unevidenced_claims(result.spec_line.strip(), product.tag_text)[:60]
-    product.description = strip_unevidenced_claims(result.description.strip(), product.tag_text)
+    product.spec_line = strip_unevidenced_claims(result.spec_line.strip(), product.evidence_text)[:60]
+    product.description = strip_unevidenced_claims(result.description.strip(), product.evidence_text)
     product.key_points = [
-        strip_unevidenced_claims(p.strip(), product.tag_text) for p in result.key_points[:3]
+        strip_unevidenced_claims(p.strip(), product.evidence_text) for p in result.key_points[:3]
     ]
     product.key_points = [p for p in product.key_points if p]
     product.sources = [s for s in result.sources[:3] if s.startswith("http")]
@@ -135,7 +106,7 @@ def research_product(client, product: Product, *, model: str) -> Product:
     return product
 
 
-def research_all(client, products: list[Product], *, model: str) -> list[Product]:
+def research_all(client: LLMClient, products: list[Product], *, model: str) -> list[Product]:
     for product in products:
         if product.publishable:
             research_product(client, product, model=model)

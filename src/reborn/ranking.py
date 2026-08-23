@@ -11,6 +11,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
+from .llm import LLMClient, text_part
 from .vision import Product
 
 log = logging.getLogger(__name__)
@@ -73,29 +74,26 @@ def pick_best(
     ]
 
     try:
-        response = client.messages.parse(
-            model=model,
-            max_tokens=4000,
+        result: Ranking = client.structured(
             system=(
                 "당신은 리본마켓 평택점 점장입니다. 리퍼브(검수 완료 새 상품) 매장을 운영합니다.\n"
                 "오늘 매장에 들어온 상품 목록을 보고 '실제로 가장 잘 팔릴 것 같은' 순서대로 고릅니다.\n"
                 "판단 기준: 할인 폭이 체감되는가, 평택 지역 손님(신혼·이사·자취·육아)이 찾는 물건인가, "
                 "가격대가 즉시 결제 가능한 범위인가, 매장에 직접 보러 올 이유가 되는가."
             ),
-            output_format=Ranking,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"오늘 상품 목록입니다.\n\n{json.dumps(listing, ensure_ascii=False, indent=2)}\n\n"
-                        f"가장 잘 팔릴 것 같은 순서대로 상위 {count}개를 골라주세요."
-                    ),
-                }
+            parts=[
+                text_part(
+                    f"오늘 상품 목록입니다.\n\n{json.dumps(listing, ensure_ascii=False, indent=2)}\n\n"
+                    f"가장 잘 팔릴 것 같은 순서대로 상위 {count}개를 골라주세요."
+                )
             ],
+            schema=Ranking,
+            max_tokens=4000,
+            model=model,
         )
         picked: list[tuple[Product, str]] = []
         used: set[int] = set()
-        for item in response.parsed_output.ranking:
+        for item in result.ranking:
             if 0 <= item.id < len(pool) and item.id not in used:
                 used.add(item.id)
                 picked.append((pool[item.id], item.why))

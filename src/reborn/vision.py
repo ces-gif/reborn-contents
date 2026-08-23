@@ -15,8 +15,6 @@
 
 from __future__ import annotations
 
-import base64
-import io
 import json
 import logging
 import re
@@ -24,13 +22,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
-log = logging.getLogger(__name__)
+from .llm import LLMClient, image_part, text_part
 
-MAX_EDGE = 1568  # Claude 비전 입력 권장 최대 변
-JPEG_QUALITY = 82
+log = logging.getLogger(__name__)
 
 PhotoKind = Literal["price_tag", "product", "both", "other"]
 
@@ -242,23 +238,8 @@ class Product:
         return data
 
 
-def encode_image(path: Path) -> dict:
-    img = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
-    img.thumbnail((MAX_EDGE, MAX_EDGE), Image.LANCZOS)
-    buffer = io.BytesIO()
-    img.save(buffer, "JPEG", quality=JPEG_QUALITY)
-    return {
-        "type": "image",
-        "source": {
-            "type": "base64",
-            "media_type": "image/jpeg",
-            "data": base64.standard_b64encode(buffer.getvalue()).decode("ascii"),
-        },
-    }
-
-
 def extract_product(
-    client,
+    client: LLMClient,
     photo_paths: list[Path],
     *,
     model: str,
@@ -268,28 +249,22 @@ def extract_product(
     source_kind: str = "refurb",
     eyebrow: str = "오늘의 리본 특가",
 ) -> Product:
-    content: list[dict] = []
+    parts: list[dict] = []
     for i, path in enumerate(photo_paths, start=1):
-        content.append({"type": "text", "text": f"[{i}번 사진]"})
-        content.append(encode_image(path))
-    content.append(
-        {
-            "type": "text",
-            "text": USER_TEMPLATE.format(
+        parts.append(text_part(f"[{i}번 사진]"))
+        parts.append(image_part(path))
+    parts.append(
+        text_part(
+            USER_TEMPLATE.format(
                 n=len(photo_paths),
                 source_note=SOURCE_NOTES.get(source_kind, SOURCE_NOTES["refurb"]),
-            ),
-        }
+            )
+        )
     )
 
-    response = client.messages.parse(
-        model=model,
-        max_tokens=4000,
-        system=SYSTEM,
-        output_format=ProductRead,
-        messages=[{"role": "user", "content": content}],
+    read: ProductRead = client.structured(
+        system=SYSTEM, parts=parts, schema=ProductRead, max_tokens=4000, model=model
     )
-    read: ProductRead = response.parsed_output
 
     kinds = [""] * len(photo_paths)
     for photo in read.photos:

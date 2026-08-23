@@ -48,6 +48,8 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          # 모델 공급자 — 둘 중 하나만 있어도 된다 (제미나이가 무료)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
@@ -72,6 +74,9 @@ jobs:
           MAX_CARDS_PER_DAY: ${{ vars.MAX_CARDS_PER_DAY }}
           INSTAGRAM_ENABLED: ${{ vars.INSTAGRAM_ENABLED }}
           MAX_STORIES_PER_DAY: ${{ vars.MAX_STORIES_PER_DAY }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          VISION_MODEL: ${{ vars.VISION_MODEL }}
+          WRITING_MODEL: ${{ vars.WRITING_MODEL }}
         run: |
           python scripts/run_daily.py \
             ${{ inputs.date && format('--date {0}', inputs.date) || '' }} \

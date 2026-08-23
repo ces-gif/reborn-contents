@@ -20,7 +20,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import branding, instagram, notify, research, social
+from . import branding, instagram, llm, notify, research, social
 from .blog import write_post
 from .cardnews import CardData, render_card
 from .config import Settings, Source
@@ -63,15 +63,9 @@ class RunResult:
         return [p for p in self.products if p.publishable]
 
 
-def anthropic_client(settings: Settings):
-    if not settings.anthropic_api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY 가 없습니다. 사진에서 상품명과 가격을 읽으려면 필요합니다. "
-            "(docs/SETUP.md 참고)"
-        )
-    from anthropic import Anthropic
-
-    return Anthropic(api_key=settings.anthropic_api_key)
+def make_llm(settings: Settings):
+    """설정에 맞는 모델 공급자를 만든다 (제미나이 무료 / Claude 유료)."""
+    return llm.make_client(settings)
 
 
 def ensure_logo(drive: Drive | None, settings: Settings) -> Path:
@@ -166,7 +160,7 @@ def run(
         (out_dir / sub).mkdir(parents=True, exist_ok=True)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    client = anthropic_client(settings)
+    client = make_llm(settings)
 
     # 2) 폴더별로 상품 묶고 가격표 읽기 --------------------------------------
     remaining = settings.max_cards_per_day or None

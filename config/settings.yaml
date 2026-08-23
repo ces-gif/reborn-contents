@@ -37,12 +37,21 @@ grouping:
   max_cards_per_day: 0
 
 model:
+  # 어느 회사 모델을 쓸지: gemini | anthropic | auto
+  #   gemini    - 구글 AI 스튜디오. 무료 등급이 있어 카드 등록 없이 쓸 수 있다. (기본)
+  #   anthropic - Claude. 유료(선불 크레딧). 가격표 판독이 조금 더 정확하다.
+  #   auto      - GEMINI_API_KEY 가 있으면 제미나이, 없으면 Claude
+  provider: "gemini"
+
   # 사진에서 상품명/가격을 읽는 모델
-  vision: "claude-opus-5"
+  vision: "gemini-2.5-flash"
   # 웹 검색으로 제품 설명을 찾고 블로그 글을 쓰는 모델
-  writing: "claude-opus-5"
-  # 비용을 줄이려면 vision 을 "claude-sonnet-5" 로 바꿔도 됩니다.
-  # (가격표 판독 정확도가 조금 떨어질 수 있어 기본값은 opus 입니다.)
+  writing: "gemini-2.5-flash"
+
+  # Claude 로 바꾸려면:
+  #   provider: "anthropic"
+  #   vision:  "claude-opus-5"
+  #   writing: "claude-opus-5"
 
 store:
   name: "리본마켓 평택점"

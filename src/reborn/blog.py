@@ -23,6 +23,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from .llm import LLMClient, text_part
 from .vision import Product
 
 log = logging.getLogger(__name__)
@@ -212,7 +213,7 @@ def _html_table(products: list[Product]) -> str:
 
 
 def write_post(
-    client,
+    client: LLMClient,
     picks: list[tuple[Product, str]],
     *,
     model: str,
@@ -238,24 +239,20 @@ def write_post(
         for i, (p, why) in enumerate(picks, start=1)
     ]
 
-    response = client.messages.parse(
-        model=model,
-        max_tokens=16000,
+    draft: PostDraft = client.structured(
         system=SYSTEM,
-        output_format=PostDraft,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"오늘은 {day.strftime('%Y년 %m월 %d일')}, {store_name} 에 아래 상품들이 들어왔습니다.\n"
-                    f"이 {len(picks)}개를 순위 그대로 소개하는 블로그 글을 써주세요.\n"
-                    "독자가 복사해서 바로 올릴 수 있을 만큼 완성도 있게, 각 상품마다 2~3문단씩 채워주세요.\n\n"
-                    f"{json.dumps(brief, ensure_ascii=False, indent=2)}"
-                ),
-            }
+        parts=[
+            text_part(
+                f"오늘은 {day.strftime('%Y년 %m월 %d일')}, {store_name} 에 아래 상품들이 들어왔습니다.\n"
+                f"이 {len(picks)}개를 순위 그대로 소개하는 블로그 글을 써주세요.\n"
+                "독자가 복사해서 바로 올릴 수 있을 만큼 완성도 있게, 각 상품마다 2~3문단씩 채워주세요.\n\n"
+                f"{json.dumps(brief, ensure_ascii=False, indent=2)}"
+            )
         ],
+        schema=PostDraft,
+        max_tokens=16000,
+        model=model,
     )
-    draft: PostDraft = response.parsed_output
 
     items = [item.model_dump() for item in draft.items]
     if len(items) != len(products):

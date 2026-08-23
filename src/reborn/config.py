@@ -67,6 +67,7 @@ class Settings:
     max_photos_per_group: int
     max_cards_per_day: int
 
+    provider: str
     vision_model: str
     writing_model: str
 
@@ -102,6 +103,10 @@ class Settings:
     @property
     def anthropic_api_key(self) -> str | None:
         return _env("ANTHROPIC_API_KEY")
+
+    @property
+    def gemini_api_key(self) -> str | None:
+        return _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
 
     @property
     def service_account_json(self) -> str | None:
@@ -149,8 +154,9 @@ def load_settings(path: Path | str | None = None) -> Settings:
             "MAX_PHOTOS_PER_GROUP", int(grouping.get("max_photos_per_group", 4))
         ),
         max_cards_per_day=_env_int("MAX_CARDS_PER_DAY", int(grouping.get("max_cards_per_day", 0))),
-        vision_model=_env("VISION_MODEL", model.get("vision", "claude-sonnet-5")),
-        writing_model=_env("WRITING_MODEL", model.get("writing", "claude-opus-5")),
+        provider=_env("LLM_PROVIDER", model.get("provider", "auto")),
+        vision_model=_env("VISION_MODEL", model.get("vision", "gemini-2.5-flash")),
+        writing_model=_env("WRITING_MODEL", model.get("writing", "gemini-2.5-flash")),
         store_name=_env("STORE_NAME", store.get("name", "리본마켓 평택점")),
         store_handle=_env("STORE_HANDLE", store.get("handle", "@reborn.mk")),
         footer_note=_env("FOOTER_NOTE", store.get("footer_note", "")),
