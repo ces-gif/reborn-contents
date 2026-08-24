@@ -1,4 +1,5 @@
 Pillow>=11.0.0
+pillow-heif>=0.18.0   # 아이폰 HEIC 사진 열기
 google-api-python-client>=2.140.0
 google-auth>=2.34.0
 google-auth-httplib2>=0.2.0
