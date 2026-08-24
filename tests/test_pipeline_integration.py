@@ -362,3 +362,46 @@ def test_instagram_is_skipped_cleanly_without_credentials(wired):
     assert result.stories.results == []
     # 인스타가 안 되더라도 나머지 발행은 다 끝나 있어야 한다
     assert result.cards and result.drive_folder_url
+
+
+def test_a_blog_failure_does_not_throw_away_the_cards(wired, monkeypatch):
+    """실제 사고: 블로그 글 한 칸의 형식이 어긋나 일산 카드뉴스 13장이 통째로 사라졌다.
+
+    카드뉴스는 이미 만들어 놓은 것이다. 뒤 단계가 넘어져도 발행은 계속돼야 한다.
+    """
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+
+    def boom(*a, **k):
+        raise RuntimeError("모델 응답이 예상한 형식이 아닙니다")
+
+    monkeypatch.setattr(pipeline, "write_post", boom)
+
+    result = pipeline.run(
+        settings,
+        day=date(2026, 8, 23),
+        out_root=tmp_path / "out",
+        work_root=tmp_path / "work",
+    )
+
+    assert len(result.cards) == 3, "블로그가 실패했다고 카드뉴스를 날리면 안 됩니다"
+    assert result.blog_files == []
+    assert any("블로그" in f for f in result.step_failures)
+    assert any(n.endswith(".png") for n in drive.uploaded), "카드가 드라이브에 올라가야 합니다"
+
+    report = (tmp_path / "out" / "2026-08-23" / "_data" / "리포트.md").read_text(encoding="utf-8")
+    assert "만들지 못한 것" in report and "블로그" in report
+
+
+def test_a_social_failure_does_not_throw_away_the_cards(wired, monkeypatch):
+    drive, client, tmp_path = wired
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+    monkeypatch.setattr(pipeline, "_write_social", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("소셜 실패")))
+
+    result = pipeline.run(
+        settings, day=date(2026, 8, 23), out_root=tmp_path / "out", work_root=tmp_path / "work"
+    )
+    assert len(result.cards) == 3
+    assert any("소셜" in f for f in result.step_failures)

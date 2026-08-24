@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .llm import LLMClient, text_part
 from .vision import Product
@@ -35,6 +35,25 @@ class PostItem(BaseModel):
     personal_note: str = Field(description="'저는 ~하곤 해요' 식 1인칭 코멘트 한 줄.")
 
 
+def _flatten_lines(value):
+    """줄 목록에 문단이 한 겹 더 씌워져 와도 받아준다.
+
+    PostDraft 의 다른 칸(intro/body/closing)은 '문단들의 배열'이라 두 겹인데,
+    table_wrapup 만 한 겹이다. 모델이 이걸 헷갈려 두 겹으로 보내면 예전에는
+    글쓰기가 통째로 실패했다 — 카드뉴스를 다 만들어 놓고 발행이 날아갔다.
+    모양이 조금 달라도 뜻은 분명하니 펴서 받는다.
+    """
+    if not isinstance(value, list):
+        return value
+    lines: list = []
+    for item in value:
+        if isinstance(item, list):
+            lines.extend(str(x) for x in item)
+        else:
+            lines.append(item)
+    return lines
+
+
 class PostDraft(BaseModel):
     category_tag: str = Field(description="글 맨 위 카테고리 태그. 예: '오늘의 리본 특가'")
     title: str = Field(description="핵심 키워드가 들어간 제목.")
@@ -45,6 +64,8 @@ class PostDraft(BaseModel):
     )
     table_intro: str = Field(description="비교표 앞에 붙일 한 줄.")
     table_wrapup: list[str] = Field(description="표 아래에서 표 내용을 말로 다시 풀어주는 문단.")
+
+    _flat = field_validator("table_wrapup", "tags", mode="before")(_flatten_lines)
     closing: list[list[str]] = Field(description="요약 + 따뜻한 응원 마무리 문단들.")
     tags: list[str] = Field(description="네이버 태그 8~12개. # 없이 단어만.")
 

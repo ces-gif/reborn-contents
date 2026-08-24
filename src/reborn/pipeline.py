@@ -61,6 +61,8 @@ class RunResult:
     skipped_reason: str | None = None
     quota_note: str | None = None
     failed_groups: int = 0
+    # 카드뉴스 뒤에 붙는 단계(블로그·소셜 등)가 넘어진 기록. 발행 자체는 계속한다.
+    step_failures: list[str] = field(default_factory=list)
 
     @property
     def published(self) -> list[Product]:
@@ -331,51 +333,48 @@ def run(
         result.cards.append(path)
 
     # 5) BEST5 블로그 ---------------------------------------------------------
-    picks = pick_best(
-        result.published, count=settings.best_count, client=client, model=client.writing_model
-    )
+    # 카드뉴스는 이미 다 만들었다. 여기서 넘어져도 그걸 날리지 않는다.
+    # (실제로 블로그 한 칸의 형식이 어긋나 일산 카드뉴스 13장이 통째로 사라졌다)
+    picks: list = []
+    try:
+        picks = pick_best(
+            result.published, count=settings.best_count, client=client, model=client.writing_model
+        )
+    except Exception as exc:
+        log.error("BEST 상품 고르기 실패, 카드뉴스는 그대로 발행합니다: %s", exc)
+        result.step_failures.append(f"BEST 상품 고르기: {exc}")
+
     if picks:
-        post = write_post(
-            client,
-            picks,
-            model=client.writing_model,
-            store_name=settings.store_name,
-            day=target_day,
-            footer_note=settings.footer_note,
-        )
-        md_path = out_dir / "블로그" / f"{day_slug}-best{len(picks)}-blog.md"
-        html_path = out_dir / "블로그" / f"{day_slug}-best{len(picks)}-blog.html"
-        md_path.write_text(
-            post.to_markdown(settings.store_name, settings.footer_note), encoding="utf-8"
-        )
-        html_path.write_text(
-            post.to_naver_html(settings.store_name, settings.footer_note), encoding="utf-8"
-        )
-        result.blog_files = [md_path, html_path]
+        try:
+            post = write_post(
+                client,
+                picks,
+                model=client.writing_model,
+                store_name=settings.store_name,
+                day=target_day,
+                footer_note=settings.footer_note,
+            )
+            md_path = out_dir / "블로그" / f"{day_slug}-best{len(picks)}-blog.md"
+            html_path = out_dir / "블로그" / f"{day_slug}-best{len(picks)}-blog.html"
+            md_path.write_text(
+                post.to_markdown(settings.store_name, settings.footer_note), encoding="utf-8"
+            )
+            html_path.write_text(
+                post.to_naver_html(settings.store_name, settings.footer_note), encoding="utf-8"
+            )
+            result.blog_files = [md_path, html_path]
+        except Exception as exc:
+            log.error("블로그 글 작성 실패, 카드뉴스는 그대로 발행합니다: %s", exc)
+            result.step_failures.append(f"블로그 글: {exc}")
 
     # 6) 카톡 공지 / 인스타 캡션 ---------------------------------------------
     best_products = [p for p, _ in picks] or result.published
     kakao_text = ""
-    if best_products:
-        kakao_text = social.kakao_notice(
-            best_products,
-            day=target_day,
-            store_name=settings.store_name,
-            footer_note=settings.footer_note,
-        )
-        kakao_path = out_dir / "소셜" / f"{day_slug}-카톡공지.txt"
-        insta_path = out_dir / "소셜" / f"{day_slug}-인스타캡션.txt"
-        kakao_path.write_text(kakao_text, encoding="utf-8")
-        insta_path.write_text(
-            social.instagram_caption(
-                best_products,
-                day=target_day,
-                store_name=settings.store_name,
-                handle=settings.store_handle,
-            ),
-            encoding="utf-8",
-        )
-        result.social_files = [kakao_path, insta_path]
+    try:
+        kakao_text = _write_social(result, settings, best_products, out_dir, day_slug, target_day)
+    except Exception as exc:
+        log.error("소셜 문구 작성 실패, 카드뉴스는 그대로 발행합니다: %s", exc)
+        result.step_failures.append(f"소셜 문구: {exc}")
 
     # 7) 근거 자료 + 실행 리포트 ---------------------------------------------
     save_products(result.products, out_dir / "_data" / "products.json")
@@ -465,6 +464,8 @@ def _report(result: RunResult, settings: Settings) -> str:
     ]
     if result.failed_groups:
         lines.append(f"- ⚠️ 판독하지 못한 묶음: {result.failed_groups}개")
+    for failure in result.step_failures:
+        lines.append(f"- ⚠️ 만들지 못한 것 — {failure}")
     if result.quota_note:
         lines += ["", "## ⚠️ 오늘 만들다 만 이유", result.quota_note]
     if result.stories is not None:
@@ -536,6 +537,8 @@ def print_summary(result: RunResult) -> None:
         print(f"   ⚠️  확인 필요 {len(result.needs_review)}건")
     if result.failed_groups:
         print(f"   ⚠️  판독 실패 {result.failed_groups}개")
+    for failure in result.step_failures:
+        print(f"   ⚠️  {failure}")
     if result.quota_note:
         print(f"   ⚠️  {result.quota_note}")
     if result.drive_folder_url:
@@ -543,3 +546,29 @@ def print_summary(result: RunResult) -> None:
     if result.notified:
         sent = [k for k, v in result.notified.items() if v]
         print(f"   알림 전송: {', '.join(sent) if sent else '(설정된 채널 없음)'}")
+
+
+def _write_social(result, settings, best_products, out_dir: Path, day_slug: str, target_day) -> str:
+    """카톡 공지와 인스타 캡션을 파일로 남기고 카톡 문구를 돌려준다."""
+    if not best_products:
+        return ""
+    kakao_text = social.kakao_notice(
+        best_products,
+        day=target_day,
+        store_name=settings.store_name,
+        footer_note=settings.footer_note,
+    )
+    kakao_path = out_dir / "소셜" / f"{day_slug}-카톡공지.txt"
+    insta_path = out_dir / "소셜" / f"{day_slug}-인스타캡션.txt"
+    kakao_path.write_text(kakao_text, encoding="utf-8")
+    insta_path.write_text(
+        social.instagram_caption(
+            best_products,
+            day=target_day,
+            store_name=settings.store_name,
+            handle=settings.store_handle,
+        ),
+        encoding="utf-8",
+    )
+    result.social_files = [kakao_path, insta_path]
+    return kakao_text
