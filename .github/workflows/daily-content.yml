@@ -22,6 +22,10 @@ on:
         required: false
         type: boolean
         default: false
+      store:
+        description: "이 매장만 실행 (비우면 전체). 예: reborn-pt, fox-ils"
+        required: false
+        type: string
 
 concurrency:
   group: reborn-daily
@@ -97,7 +101,8 @@ jobs:
           python scripts/run_daily.py \
             ${{ inputs.date && format('--date {0}', inputs.date) || '' }} \
             ${{ inputs.dry_run && '--dry-run' || '' }} \
-            ${{ inputs.reprocess && '--reprocess' || '' }}
+            ${{ inputs.reprocess && '--reprocess' || '' }} \
+            ${{ inputs.store && format('--store {0}', inputs.store) || '' }}
 
       - name: 생성물 아티팩트로 보관 (2주)
         if: always()
