@@ -549,3 +549,88 @@ def save_products(products: list[Product], path: Path) -> Path:
         json.dumps([p.to_dict() for p in products], ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return path
+
+
+# ------------------------------------------------ 카드에 쓸 사진 검문 (마지막 관문)
+
+SCREEN_SYSTEM = """당신은 리본마켓 카드뉴스의 마지막 검수자입니다.
+사진 한 장을 보고, **이 사진을 카드뉴스 배경으로 써도 되는지**만 판정합니다.
+
+카드뉴스 배경은 손님이 보고 "아, 저 물건이구나" 하고 알아볼 수 있어야 합니다.
+가격표 사진이 배경으로 나가면 광고가 아니라 사고입니다.
+
+이렇게 판단하세요.
+1. 사진에서 가격표(종이·스티커·POP)를 손으로 가린다고 상상합니다.
+2. 그러고도 남는 것이 무엇인지 봅니다.
+3. 그 남은 것만으로 물건의 정체와 생김새를 알 수 있으면 ok=true.
+
+ok=false 로 두어야 하는 경우:
+- 가격표가 화면의 상당 부분을 차지한다
+- 가격표를 가리면 흰 상자면·벽·바닥·천처럼 무엇인지 알 수 없는 면만 남는다
+- 물건이 잘려서 일부만 보이거나, 너무 가까이 찍혀 전체 형태를 알 수 없다
+- 무슨 물건인지 헷갈린다
+
+**애매하면 무조건 false 입니다.** 카드를 한 장 덜 만드는 것이,
+가격표 사진을 내보내는 것보다 훨씬 낫습니다."""
+
+
+class CardPhotoScreen(BaseModel):
+    visible_besides_tag: str = Field(
+        description="가격표를 가렸을 때 사진에 남는 것을 그대로 묘사. 예: '검은 사무용 의자 전체', '흰 상자면뿐'"
+    )
+    tag_dominates: bool = Field(description="가격표가 화면의 상당 부분을 차지하면 true")
+    ok: bool = Field(description="카드뉴스 배경으로 써도 되면 true. 애매하면 false.")
+
+
+def screen_card_photo(
+    client: LLMClient, path: Path, *, product_name: str, model: str
+) -> CardPhotoScreen:
+    """카드 배경 후보 사진 한 장을 놓고 다시 판정한다.
+
+    분류(classify)와 판독(extract)은 여러 장을 한꺼번에 보면서 상품명·가격까지
+    같이 처리하느라 '이 사진에 물건이 보이는가'를 자주 놓친다. 실제로 흰 상자에
+    가격표만 붙은 사진이 '상품 사진'으로 분류돼 카드에 실렸다.
+    그래서 카드에 쓰기 직전에 **그 사진 한 장만** 놓고 이것만 묻는다.
+    """
+    parts = [
+        image_part(path),
+        text_part(
+            f"이 사진을 '{product_name}' 카드뉴스의 배경으로 써도 될까요?\n"
+            "가격표를 가렸을 때 무엇이 남는지 먼저 적고, 그 다음에 판정하세요."
+        ),
+    ]
+    return client.structured(
+        system=SCREEN_SYSTEM, parts=parts, schema=CardPhotoScreen, max_tokens=1000, model=model
+    )
+
+
+def pick_card_photo(client: LLMClient, product: "Product", *, model: str) -> None:
+    """카드에 쓸 사진을 검문해서 정하고, 쓸 사진이 없으면 발행을 막는다.
+
+    후보를 앞에서부터 검문하다가 통과하는 첫 사진을 쓴다.
+    전부 떨어지면 카드를 만들지 않는다 — 가격표 사진을 내보내느니 안 만든다.
+    """
+    if not product.publishable:
+        return
+    candidates = product._card_candidates()
+    rejected: list[str] = []
+    for index in candidates:
+        path = Path(product.photo_paths[index - 1])
+        try:
+            verdict = screen_card_photo(client, path, product_name=product.product_name, model=model)
+        except Exception as exc:  # 검문에 실패하면 원래 판단을 믿는다 (발행을 막지는 않는다)
+            log.warning("[%s] 사진 검문 실패, 그대로 진행합니다: %s", product.product_name, exc)
+            product.best_photo_index = index
+            return
+        if verdict.ok and not verdict.tag_dominates:
+            product.best_photo_index = index
+            return
+        rejected.append(f"{path.name}({verdict.visible_besides_tag})")
+        product.photo_shows_product[index - 1] = False
+
+    reason = "카드에 쓸 상품 사진이 없습니다 — 가격표만 크게 찍혔습니다"
+    if rejected:
+        reason += f" · 검토한 사진: {', '.join(rejected)}"
+    log.info("[%s] %s", product.product_name, reason)
+    product.review_reason = "; ".join(filter(None, [product.review_reason, reason]))
+    product.needs_review = True

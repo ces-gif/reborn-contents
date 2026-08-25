@@ -112,6 +112,12 @@ class FakeLLM:
                 review_reason="",
             )
 
+        if name == "CardPhotoScreen":
+            # 통합 테스트의 가짜 사진은 전부 멀쩡한 상품 사진으로 본다
+            return vision.CardPhotoScreen(
+                visible_besides_tag="상품 전체", tag_dominates=False, ok=True
+            )
+
         if name == "Research":
             assert search, "웹 검색을 켜지 않았습니다"
             return research.Research(

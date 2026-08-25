@@ -29,7 +29,13 @@ from .drive import Drive, DriveFile, upload_tree
 from .grouping import capture_time, filter_for_day, group_by_content
 from .ranking import pick_best
 from .state import LEDGER_NAME, Ledger
-from .vision import Product, classify_photos, extract_product, save_products
+from .vision import (
+    Product,
+    classify_photos,
+    extract_product,
+    pick_card_photo,
+    save_products,
+)
 
 log = logging.getLogger(__name__)
 
@@ -308,7 +314,10 @@ def run(
             if not product.publishable:
                 result.needs_review.append(product)
 
-    # 3) 인터넷에서 제품을 찾아 짧은 설명을 붙인다 (확인 안 되면 안 붙인다) --
+    # 3) 카드에 쓸 사진을 한 장씩 검문한다 (가격표 사진이 배경으로 나가는 것을 막는 마지막 관문)
+    _screen_card_photos(client, result)
+
+    # 4) 인터넷에서 제품을 찾아 짧은 설명을 붙인다 (확인 안 되면 안 붙인다) --
     research.research_all(client, result.products, model=client.writing_model)
 
     # 4) 카드뉴스 만들기 ------------------------------------------------------
@@ -576,3 +585,22 @@ def _write_social(result, settings, best_products, out_dir: Path, day_slug: str,
     )
     result.social_files = [kakao_path, insta_path]
     return kakao_text
+
+
+def _screen_card_photos(client, result: RunResult) -> None:
+    """카드 배경 후보를 병렬로 검문한다. 상품끼리 독립이라 동시에 돌린다."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    targets = [p for p in result.products if p.publishable]
+    if not targets:
+        return
+    log.info("카드에 쓸 사진 %d개를 검문합니다", len(targets))
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        list(pool.map(lambda p: pick_card_photo(client, p, model=client.vision_model), targets))
+
+    blocked = [p for p in targets if not p.publishable]
+    for product in blocked:
+        if product not in result.needs_review:
+            result.needs_review.append(product)
+    if blocked:
+        log.warning("가격표만 크게 찍혀 카드를 만들지 않는 상품 %d개", len(blocked))
