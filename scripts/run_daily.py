@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -52,6 +53,7 @@ def main() -> int:
     log = logging.getLogger("reborn")
 
     failed: list[str] = []
+    results: dict = {}
     for settings in stores:
         if len(stores) > 1:
             print(f"\n━━━ {settings.store_name} ━━━")
@@ -70,12 +72,44 @@ def main() -> int:
             print(f"❌ {settings.store_name} 실패: {exc}", file=sys.stderr)
             failed.append(settings.store_name)
             continue
+        results[settings.store_id] = result
         print_summary(result)
+
+    _write_status(Path(args.out), stores, results, failed)
 
     if failed:
         print(f"\n❌ 실패한 매장: {', '.join(failed)}", file=sys.stderr)
         return 1
     return 0
+
+
+def _write_status(out_root: Path, stores, results: dict, failed: list[str]) -> None:
+    """실행 결과를 한 파일로 남긴다.
+
+    깃허브 액션이 이걸 읽어서 뭔가 잘못됐으면 이슈를 연다 (이슈는 메일로 온다).
+    "돌긴 돌았는데 사진이 있는데도 카드가 0장" 같은 조용한 실패를 놓치지 않으려는 것이다.
+    """
+    payload = {"failed": failed, "stores": []}
+    for settings in stores:
+        result = results.get(settings.store_id)
+        payload["stores"].append(
+            {
+                "id": settings.store_id,
+                "name": settings.store_name,
+                "ok": result is not None,
+                "photos": getattr(result, "photos_seen", 0) if result else 0,
+                "cards": len(getattr(result, "cards", [])) if result else 0,
+                "skipped": getattr(result, "skipped_reason", None) if result else "실행 실패",
+                "problems": list(getattr(result, "step_failures", [])) if result else [],
+            }
+        )
+    try:
+        out_root.mkdir(parents=True, exist_ok=True)
+        (out_root / "_status.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except Exception as exc:  # 상태 파일 때문에 실행을 실패로 만들지는 않는다
+        logging.getLogger("reborn").warning("상태 파일을 남기지 못했습니다: %s", exc)
 
 
 if __name__ == "__main__":

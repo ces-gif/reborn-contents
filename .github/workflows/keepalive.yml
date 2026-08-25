@@ -1,0 +1,30 @@
+name: 예약 실행 꺼지지 않게 (월 1회)
+
+# 깃허브는 저장소에 60일간 커밋이 없으면 **예약 실행(cron)을 자동으로 꺼버린다.**
+# 매일 콘텐츠가 나가고 있어도 그건 '저장소 활동'으로 치지 않는다.
+# 개발이 한동안 멈추면 어느 날 조용히 발행이 끊기는데, 알아채기가 매우 어렵다.
+#
+# 그래서 한 달에 한 번 심장박동만 찍는다. 커밋 한 줄이면 60일 시계가 초기화된다.
+on:
+  schedule:
+    - cron: "17 5 1 * *"   # 매월 1일 14:17 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 심장박동 찍기
+        run: |
+          mkdir -p .github
+          date -u '+%Y-%m-%dT%H:%M:%SZ' > .github/last-heartbeat.txt
+          git config user.name  "reborn-bot"
+          git config user.email "noreply@github.com"
+          git add .github/last-heartbeat.txt
+          git commit -m "예약 실행 유지용 심장박동 $(date -u '+%Y-%m-%d')" || exit 0
+          git push

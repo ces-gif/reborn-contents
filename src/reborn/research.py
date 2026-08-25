@@ -10,6 +10,9 @@ Claude API 의 서버 도구 web_search 를 쓴다 (별도 검색 API 키가 필
 from __future__ import annotations
 
 import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from pydantic import BaseModel, Field
 
@@ -108,14 +111,53 @@ def research_product(client: LLMClient, product: Product, *, model: str) -> Prod
     return product
 
 
-def research_all(client: LLMClient, products: list[Product], *, model: str) -> list[Product]:
-    for product in products:
-        if not product.publishable:
-            continue
+# 상품 하나당 웹 검색 한 번, 한 번에 30~60초가 걸린다. 순서대로 돌리면 상품 14개에
+# 9분이 넘어갔고 그게 하루 실행 시간의 절반이었다. 상품끼리는 서로 아무 상관이 없으니
+# 몇 개씩 동시에 돌린다. 러너가 2코어라 많이 늘리면 오히려 느려진다.
+RESEARCH_WORKERS = 3
+
+
+def research_all(
+    client: LLMClient, products: list[Product], *, model: str, workers: int = 0
+) -> list[Product]:
+    """상품마다 웹 검색으로 설명을 붙인다. 상품끼리 독립이라 동시에 돌린다."""
+    workers = workers or _env_int("RESEARCH_WORKERS", RESEARCH_WORKERS)
+    todo = [p for p in products if p.publishable]
+    if not todo:
+        return products
+    if workers <= 1 or len(todo) == 1:
+        _research_sequentially(client, todo, model=model)
+        return products
+
+    quota_hit = threading.Event()
+
+    def one(product: Product) -> None:
+        if quota_hit.is_set():  # 한도를 다 썼으면 남은 것도 전부 같은 오류다
+            return
         try:
             research_product(client, product, model=model)
         except LLMQuotaError as exc:
-            # 한도를 다 썼으면 나머지도 전부 같은 오류다. 설명 없이 발행은 계속한다.
-            log.warning("하루 요청 한도를 다 써서 상품 설명 붙이기를 여기서 멈춥니다: %s", exc)
-            break
+            if not quota_hit.is_set():
+                log.warning("하루 요청 한도를 다 써서 상품 설명 붙이기를 멈춥니다: %s", exc)
+            quota_hit.set()
+
+    log.info("상품 %d개 설명을 %d개씩 동시에 찾습니다", len(todo), workers)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(one, todo))
     return products
+
+
+def _research_sequentially(client: LLMClient, todo: list[Product], *, model: str) -> None:
+    for product in todo:
+        try:
+            research_product(client, product, model=model)
+        except LLMQuotaError as exc:
+            log.warning("하루 요청 한도를 다 써서 상품 설명 붙이기를 여기서 멈춥니다: %s", exc)
+            return
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name) or default)
+    except ValueError:
+        return default
