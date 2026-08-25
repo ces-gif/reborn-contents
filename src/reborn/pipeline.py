@@ -27,6 +27,7 @@ from .cardnews import CardData, render_card
 from .config import ASSETS, Settings, Source
 from .drive import Drive, DriveFile, upload_tree
 from .grouping import capture_time, filter_for_day, group_by_content
+from .imaging import exif_capture_time
 from .ranking import pick_best
 from .state import LEDGER_NAME, Ledger
 from .vision import (
@@ -231,11 +232,31 @@ def run(
         if not files:
             continue
 
+        # 먼저 원본을 그대로 받는다. 파일 안의 EXIF 촬영 시각을 봐야
+        # 진짜 찍은 순서를 알 수 있는데, 그러려면 파일이 손에 있어야 한다.
+        photo_dir = work_dir / slugify(source.name)
+        photo_dir.mkdir(parents=True, exist_ok=True)
+        raw_by_id: dict[str, Path] = {}
+        for file in files:
+            raw = photo_dir / f"원본-{file.id[:10]}-{file.name}"
+            if not raw.exists():
+                drive.download(file.id, raw)
+            raw_by_id[file.id] = raw
+
+        # 찍은 순서대로 다시 세운다.
+        # 아이폰 사진(IMG_7499.HEIC)은 파일명에 시각이 없어서 예전에는
+        # 드라이브 업로드 시각으로 세웠는데, 한 번에 20여 장을 올리면
+        # 업로드가 병렬로 끝나 순서가 뒤섞였다. 그러면 상품 사진과 가격표
+        # 사진이 서로 떨어져서 짝을 못 찾는다(08-25 일산점: 23장 → 묶음 22개).
+        files.sort(
+            key=lambda f: exif_capture_time(raw_by_id[f.id], settings.timezone)
+            or capture_time(f, settings.timezone)
+        )
+
         paths_by_id: dict[str, Path] = {}
         for i, file in enumerate(files, start=1):
-            dest = work_dir / slugify(source.name) / f"{i:03d}-{file.name}"
-            if not dest.exists():
-                drive.download(file.id, dest)
+            dest = photo_dir / f"{i:03d}-{file.name}"
+            _place(raw_by_id[file.id], dest)
             paths_by_id[file.id] = dest
 
         photo_paths = [paths_by_id[f.id] for f in files]
@@ -450,6 +471,21 @@ def _find_publish_root(drive: Drive, settings: Settings) -> str | None:
     if not parent:
         return None
     return drive.find_child(parent, settings.publish_folder_name)
+
+
+def _place(src: Path, dest: Path) -> None:
+    """받아둔 원본을 촬영 순서 번호가 붙은 이름으로 놓는다.
+
+    같은 파일을 두 번 받지 않으려고 하드링크를 먼저 시도하고,
+    안 되면(파일시스템이 다르거나 권한이 없으면) 복사한다.
+    """
+    if dest.exists():
+        dest.unlink()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(src, dest)
+    except OSError:
+        shutil.copy2(src, dest)
 
 
 def _load_ledger(drive: Drive, publish_root: str, work_root: Path) -> Ledger:

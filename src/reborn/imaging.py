@@ -39,3 +39,53 @@ def register_heif() -> bool:
         return False
     _registered = True
     return True
+
+
+# ---------------------------------------------------------------- 촬영 시각
+
+
+_EXIF_ORIGINAL = 36867  # DateTimeOriginal
+_EXIF_DIGITIZED = 36868  # DateTimeDigitized
+_EXIF_MODIFIED = 306  # DateTime
+
+
+def exif_capture_time(path, tz: str = "Asia/Seoul"):
+    """사진 파일 안에 적힌 촬영 시각. 못 읽으면 None.
+
+    아이폰 사진은 파일명이 IMG_7499.HEIC 라 이름에서 시각을 알 수 없다.
+    그럴 때 드라이브 업로드 시각으로 세우면 순서가 뒤죽박죽이 된다 —
+    한 번에 20여 장을 올리면 업로드가 병렬로 끝나서 찍은 순서와 무관해진다.
+    08-25 일산점이 딱 그랬다: 사진 23장이 상품 묶음 22개로 흩어져서
+    상품 사진과 가격표 사진이 짝을 못 찾았다.
+
+    그래서 파일 안의 EXIF 촬영 시각을 우선으로 본다.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    register_heif()
+    try:
+        from PIL import Image
+
+        with Image.open(path) as img:
+            exif = img.getexif()
+    except Exception:  # pragma: no cover - 손상된 파일
+        return None
+    if not exif:
+        return None
+    # DateTimeOriginal 은 Exif 하위 IFD(0x8769) 에 들어 있다. 최상위만 보면 놓친다.
+    try:
+        sub = exif.get_ifd(0x8769) or {}
+    except Exception:  # pragma: no cover
+        sub = {}
+    for tag in (_EXIF_ORIGINAL, _EXIF_DIGITIZED, _EXIF_MODIFIED):
+        raw = sub.get(tag) or exif.get(tag)
+        if not raw:
+            continue
+        text = str(raw).strip()
+        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(text[:19], fmt).replace(tzinfo=ZoneInfo(tz))
+            except ValueError:
+                continue
+    return None
