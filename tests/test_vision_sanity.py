@@ -97,9 +97,11 @@ def test_card_line_prefers_web_spec_over_tag_condition():
     assert p.card_line == "12kg 인버터 드럼세탁기"
 
 
-def test_card_line_falls_back_to_tag_condition():
-    # 상태 표기는 "까짐" 처럼 단어 하나인 경우가 많아 출처를 붙여 내보낸다.
-    assert make(condition_note="전시상품").card_line == "가격표 표기: 전시상품"
+def test_card_line_does_not_borrow_the_tag_condition():
+    # 상태 표기는 소개가 아니라 고지사항이다. 카드에서 자리가 다르다.
+    p = make(condition_note="전시상품")
+    assert p.card_line == ""
+    assert p.card_condition == "전시상품"
 
 
 def test_card_line_is_empty_when_nothing_is_known():

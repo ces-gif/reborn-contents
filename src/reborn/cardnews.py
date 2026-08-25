@@ -47,6 +47,7 @@ class CardData:
     product_name: str
     one_liner: str
     sale_price: int
+    condition_note: str = ""  # 가격표에 직원이 적어 둔 상태 (까짐·사용감·기스 등)
     original_price: int | None = None
     discount_pct: int | None = None
     eyebrow: str = "오늘의 리본 특가"
@@ -113,6 +114,38 @@ def _logo_image(logo, strict_logo: bool) -> Image.Image:
     return B.fit_logo(img, area=LOGO_AREA, max_w=LOGO_MAX_W, max_h=LOGO_MAX_H)
 
 
+
+# 사진 위 왼쪽 아래에 붙는 상태 고지. 가격표에 직원이 적어 둔 말(까짐·사용감·
+# 기스 등)을 그대로 옮긴다. 리퍼브 매장에서 이건 숨길 것이 아니라 먼저 알릴
+# 것이다. 다만 상품 **소개** 자리에 들어가면 "까짐" 한 단어짜리 카드가 되므로
+# 자리를 따로 준다.
+COND_PAD_X = 26
+COND_PAD_Y = 14
+COND_INSET = 24
+COND_BG = (27, 30, 38, 235)
+
+
+def _draw_condition(draw: ImageDraw.ImageDraw, note: str) -> None:
+    note = (note or "").strip()
+    if not note:
+        return
+    font = B.font("bold", 30)
+    label = f"상태 · {note}"
+    # 사진 폭을 넘지 않게 자른다
+    while text_width(label, font) > CONTENT_W - COND_INSET * 2 - COND_PAD_X * 2 and len(label) > 6:
+        note = note[:-1]
+        label = f"상태 · {note}…"
+    tw = text_width(label, font)
+    ascent, descent = font.getmetrics()
+    th = ascent + descent
+    x0 = MARGIN + COND_INSET
+    y1 = Y_PHOTO + PHOTO_H - COND_INSET
+    y0 = y1 - th - COND_PAD_Y * 2
+    draw.rounded_rectangle(
+        [x0, y0, x0 + tw + COND_PAD_X * 2, y1], radius=(th + COND_PAD_Y * 2) // 2, fill=COND_BG
+    )
+    draw.text((x0 + COND_PAD_X, y0 + COND_PAD_Y), label, font=font, fill=(255, 255, 255))
+
 def render_card(
     data: CardData,
     photo_path: Path,
@@ -175,6 +208,7 @@ def render_card(
         outline=(231, 233, 238),
         width=2,
     )
+    _draw_condition(draw, data.condition_note)
 
     # 8) 가격 바 — 오렌지 통짜, 화면 끝까지
     draw.rectangle([0, Y_PRICE, W, Y_PRICE + PRICE_H], fill=B.ORANGE)

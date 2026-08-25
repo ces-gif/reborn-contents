@@ -81,3 +81,53 @@ def test_very_long_product_name_still_fits(tmp_path, logo, photo):
     )
     with Image.open(out) as img:
         assert img.size == (1080, 1920)
+
+
+# ---------------------------------------------------------------- 상태 고지 뱃지
+
+
+def _card(**kw):
+    from reborn.cardnews import CardData
+
+    base = dict(
+        product_name="테스트 상품",
+        one_liner="",
+        sale_price=10000,
+        original_price=20000,
+        date_label="2026.08.25",
+    )
+    base.update(kw)
+    return CardData(**base)
+
+
+def test_상태표기가_있으면_사진_위에_뱃지가_그려진다(tmp_path, monkeypatch, photo, logo):
+    from reborn import cardnews
+
+    drawn: list[str] = []
+    real = cardnews._draw_condition
+
+    def spy(draw, note):
+        drawn.append(note)
+        return real(draw, note)
+
+    monkeypatch.setattr(cardnews, "_draw_condition", spy)
+    cardnews.render_card(_card(condition_note="까짐"), photo, tmp_path / "c.png")
+    assert drawn == ["까짐"]
+
+
+def test_상태표기가_없으면_아무것도_안_그린다(tmp_path, photo, logo):
+    from PIL import Image
+
+    from reborn import cardnews
+
+    a = cardnews.render_card(_card(), photo, tmp_path / "a.png")
+    b = cardnews.render_card(_card(condition_note="  "), photo, tmp_path / "b.png")
+    assert Image.open(a).tobytes() == Image.open(b).tobytes()
+
+
+def test_아주_긴_상태표기는_사진_밖으로_안_넘어간다(tmp_path, photo, logo):
+    from reborn import cardnews
+
+    note = "모서리 찌그러짐과 표면 까짐 그리고 사용감이 상당히 많이 있습니다 확인 바랍니다"
+    out = cardnews.render_card(_card(condition_note=note), photo, tmp_path / "c.png")
+    assert out.exists()

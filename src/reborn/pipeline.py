@@ -389,6 +389,7 @@ def run(
         card = CardData(
             product_name=product.product_name,
             one_liner=product.card_line,
+            condition_note=product.card_condition,
             sale_price=product.sale_price,
             original_price=product.original_price,
             discount_pct=product.discount_pct,

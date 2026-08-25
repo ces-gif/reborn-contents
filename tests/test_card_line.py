@@ -21,14 +21,17 @@ def test_웹설명이_있으면_그대로_쓴다():
     assert p.card_line == "스테인리스 보온병 355ml"
 
 
-def test_설명이_없으면_상태표기에_출처를_붙인다():
+def test_상태표기는_소개_자리에_들어가지_않는다():
+    """\"까짐\" 은 직원이 적어 둔 고지사항이지 상품 소개가 아니다."""
     p = _product(condition_note="까짐")
-    assert p.card_line == "가격표 표기: 까짐"
+    assert p.card_line == ""
+    assert p.card_condition == "까짐"
 
 
-def test_이미_가격표로_시작하면_덧붙이지_않는다():
-    p = _product(condition_note="가격표 표기: 전시상품")
-    assert p.card_line == "가격표 표기: 전시상품"
+def test_설명과_상태표기는_따로_나간다():
+    p = _product(spec_line="6인용 IH 압력밥솥", condition_note="사용감 있음")
+    assert p.card_line == "6인용 IH 압력밥솥"
+    assert p.card_condition == "사용감 있음"
 
 
 def test_아무것도_없으면_빈_줄():
@@ -37,4 +40,5 @@ def test_아무것도_없으면_빈_줄():
 
 def test_공백만_있는_설명은_설명이_아니다():
     p = _product(spec_line="   ", condition_note="찍힘")
-    assert p.card_line == "가격표 표기: 찍힘"
+    assert p.card_line == ""
+    assert p.card_condition == "찍힘"
