@@ -98,7 +98,8 @@ def test_card_line_prefers_web_spec_over_tag_condition():
 
 
 def test_card_line_falls_back_to_tag_condition():
-    assert make(condition_note="전시상품").card_line == "전시상품"
+    # 상태 표기는 "까짐" 처럼 단어 하나인 경우가 많아 출처를 붙여 내보낸다.
+    assert make(condition_note="전시상품").card_line == "가격표 표기: 전시상품"
 
 
 def test_card_line_is_empty_when_nothing_is_known():

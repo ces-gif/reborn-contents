@@ -317,8 +317,20 @@ class Product:
 
     @property
     def card_line(self) -> str:
-        """카드뉴스 한 줄 소개. 웹에서 확인된 설명 우선, 없으면 가격표에 적힌 상태 표기."""
-        return self.spec_line or self.condition_note
+        """카드뉴스 한 줄 소개. 웹에서 확인된 설명 우선, 없으면 가격표에 적힌 상태 표기.
+
+        상태 표기는 "까짐", "찍힘" 처럼 단어 하나로 적혀 있는 경우가 많다.
+        그걸 그대로 상품 소개 자리에 넣으면 카드에 "까짐" 한 단어만 뜬다
+        (실제로 08-25 카드 1번이 그랬다). 무슨 말인지 알 수 있게 출처를 붙인다.
+        """
+        if self.spec_line.strip():
+            return self.spec_line.strip()
+        note = self.condition_note.strip()
+        if not note:
+            return ""
+        if note.startswith("가격표"):
+            return note
+        return f"가격표 표기: {note}"
 
     @property
     def publishable(self) -> bool:
