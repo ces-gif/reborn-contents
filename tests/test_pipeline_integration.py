@@ -74,7 +74,11 @@ class FakeLLM:
             self.assigned.extend(kinds)
             return vision.PhotoBatch(
                 photos=[
-                    vision.PhotoClass(index=i + 1, kind=k, item="") for i, k in enumerate(kinds)
+                    vision.PhotoClass(
+                        index=i + 1, kind=k, item="",
+                        product_visible=k in ("product", "both"),
+                    )
+                    for i, k in enumerate(kinds)
                 ]
             )
 
@@ -88,7 +92,12 @@ class FakeLLM:
             else:
                 kinds = ["both"] if len(images) == 1 else ["price_tag", "product"]
             return vision.ProductRead(
-                photos=[vision.PhotoRead(index=i + 1, kind=k) for i, k in enumerate(kinds)],
+                photos=[
+                    vision.PhotoRead(
+                        index=i + 1, kind=k, product_visible=k in ("product", "both")
+                    )
+                    for i, k in enumerate(kinds)
+                ],
                 product_name=f"쿠쿠 {idx}호 밥솥",
                 tag_text="온라인가 200,000 / 리본가 100,000",
                 condition_note="",

@@ -236,6 +236,7 @@ def run(
         classes = classify_photos(client, photo_paths, model=client.vision_model)
         kinds = [c.kind for c in classes]
         items = [c.item for c in classes]
+        shows = [c.product_visible for c in classes]
         log.info(
             "[%s] 사진 판독: 상품 %d · 가격표 %d · 상품+가격표 %d · 제외 %d",
             source.name,
@@ -264,6 +265,8 @@ def run(
         for group in groups:
             paths = [paths_by_id[f.id] for f in group.files]
             known = list(group.kinds)
+            by_id = {f.id: i for i, f in enumerate(files)}
+            known_seen = [shows[by_id[f.id]] for f in group.files]
             try:
                 product = extract_product(
                     client,
@@ -275,6 +278,7 @@ def run(
                     source_kind=source.kind,
                     eyebrow=source.eyebrow,
                     known_kinds=known,
+                    known_shows=known_seen,
                 )
             except LLMQuotaError as exc:
                 result.quota_note = str(exc).split("\n")[0]

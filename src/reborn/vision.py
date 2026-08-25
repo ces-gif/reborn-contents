@@ -84,9 +84,17 @@ class PhotoRead(BaseModel):
     index: int = Field(description="사진 번호 (1부터)")
     kind: PhotoKind = Field(
         description=(
-            "price_tag=가격표만 찍힘, product=상품만 찍힘, "
-            "both=상품과 가격표가 한 장에 같이 찍힘, other=둘 다 아님"
+            "price_tag=가격표가 주인공, product=상품만 찍힘, "
+            "both=상품 생김새가 보이면서 가격표도 같이 찍힘, other=둘 다 아님"
         )
+    )
+    product_visible: bool = Field(
+        default=False,
+        description=(
+            "이 사진만 보고 **무슨 물건인지 알아볼 수 있으면** true. "
+            "가격표가 화면 대부분을 차지하거나, 흰 상자면·벽·천처럼 무엇인지 알 수 없는 면만 "
+            "보이면 false. 카드뉴스 배경으로 쓸 수 있는 사진인지를 정하는 값이라 엄격하게 판단한다."
+        ),
     )
 
 
@@ -97,6 +105,13 @@ class PhotoClass(BaseModel):
             "price_tag=가격표만 찍힘, product=상품만 찍힘, "
             "both=상품과 가격표가 한 장에 같이 찍힘, other=상품 사진이 아님(매장 전경 등)"
         )
+    )
+    product_visible: bool = Field(
+        default=False,
+        description=(
+            "이 사진만 보고 무슨 물건인지 알아볼 수 있으면 true. "
+            "가격표가 화면 대부분이거나 흰 면만 보이면 false."
+        ),
     )
     item: str = Field(
         description=(
@@ -114,10 +129,17 @@ class PhotoBatch(BaseModel):
 CLASSIFY_SYSTEM = """당신은 리본마켓 평택점의 콘텐츠 담당자입니다.
 매장에서 찍은 사진들을 한 장씩 분류합니다. 오직 분류만 하고 가격은 읽지 않습니다.
 
-- price_tag : 가격표(POP)만 찍힌 사진. 종이/스티커에 상품명과 가격이 적힌 것.
+- price_tag : 가격표(POP)가 주인공인 사진. 종이/스티커에 상품명과 가격이 적힌 것.
 - product   : 상품만 찍힌 사진. 가격표가 없거나 알아볼 수 없게 작게 나온 것.
-- both      : 한 장에 상품과 가격표가 같이 나온 사진.
+- both      : 한 장에 **상품의 생김새를 알아볼 수 있게** 나오고 가격표도 같이 보이는 사진.
 - other     : 매장 전경, 간판, 영수증, 사람만 나온 사진 등 상품 사진이 아닌 것.
+
+**both 와 price_tag 를 가르는 기준 (가장 자주 틀리는 곳입니다)**
+가격표가 상품 위에 붙어 있어도, 사진에 보이는 것이 흰 상자면·벽·천 같은
+"무엇인지 알 수 없는 면" 뿐이라면 그건 **price_tag** 입니다.
+"이 사진만 보고 무슨 물건인지 남에게 설명할 수 있는가?" 로 판단하세요.
+설명할 수 없으면 both 가 아닙니다. 애매하면 price_tag 로 두세요 —
+가격표 사진이 카드뉴스 배경으로 나가는 것이 가장 나쁜 결과입니다.
 
 item 에는 **그 사진의 상품이 무엇인지**를 짧게 적습니다. 이걸로 같은 상품끼리 묶습니다.
 가격표 사진이라면 가격표에 적힌 상품명을 그대로 적습니다 — 가장 중요합니다.
@@ -217,6 +239,7 @@ class Product:
     best_photo_index: int = 0
     photo_kinds: list[str] = field(default_factory=list)
     needs_review: bool = False
+    photo_shows_product: list[bool] = field(default_factory=list)
     review_reason: str = ""      # 발행을 막는 사유
     cautions: str = ""           # 카드는 만들되 사람이 한 번 볼 만한 것
 
@@ -256,19 +279,32 @@ class Product:
 
     @property
     def has_product_photo(self) -> bool:
-        return any(k in ("product", "both") for k in self.photo_kinds)
+        return bool(self._card_candidates())
+
+    def _card_candidates(self) -> list[int]:
+        """카드뉴스 배경으로 쓸 수 있는 사진 번호들 (1부터).
+
+        종류가 product/both 인 것만으로는 부족하다. 흰 상자면에 가격표만 붙은 사진을
+        모델이 both 로 부른 적이 있고, 그게 그대로 카드에 실렸다.
+        그래서 '이 사진만 보고 무슨 물건인지 알아볼 수 있는가'(shows_product)를
+        따로 묻고, 그 답이 참인 사진만 후보로 둔다.
+        """
+        shows = self.photo_shows_product or []
+        return [
+            i
+            for i, kind in enumerate(self.photo_kinds, start=1)
+            if kind in ("product", "both") and (i - 1 >= len(shows) or shows[i - 1])
+        ]
 
     @property
     def best_photo(self) -> Path:
-        """카드뉴스 배경으로 쓸 사진. 반드시 상품이 보이는 사진."""
-        product_indexes = [
-            i for i, k in enumerate(self.photo_kinds, start=1) if k in ("product", "both")
-        ]
+        """카드뉴스 배경으로 쓸 사진. 반드시 상품을 알아볼 수 있는 사진."""
+        candidates = self._card_candidates()
         idx = self.best_photo_index
-        if idx not in product_indexes:
-            idx = product_indexes[0] if product_indexes else 0
+        if idx not in candidates:
+            idx = candidates[0] if candidates else 0
         if not idx:
-            raise ValueError(f"상품이 보이는 사진이 없습니다: {self.product_name}")
+            raise ValueError(f"상품을 알아볼 수 있는 사진이 없습니다: {self.product_name}")
         return Path(self.photo_paths[idx - 1])
 
     @property
@@ -356,6 +392,7 @@ def extract_product(
     source_kind: str = "refurb",
     eyebrow: str = "오늘의 리본 특가",
     known_kinds: list[str] | None = None,
+    known_shows: list[bool] | None = None,
 ) -> Product:
     parts: list[dict] = []
     for i, path in enumerate(photo_paths, start=1):
@@ -375,9 +412,16 @@ def extract_product(
     )
 
     kinds = [""] * len(photo_paths)
+    shows = [False] * len(photo_paths)
     for photo in read.photos:
         if 1 <= photo.index <= len(kinds):
             kinds[photo.index - 1] = photo.kind
+            shows[photo.index - 1] = bool(photo.product_visible)
+
+    # 1차 판독도 "상품이 보인다" 고 한 사진은 그 판단을 살려 준다.
+    for i, known in enumerate(known_shows or []):
+        if i < len(shows) and known:
+            shows[i] = True
 
     # 1차 판독에서 "가격표"로 본 사진은 카드 배경으로 쓰지 않는다.
     # 사진 한 장만 놓고 본 1차 판독이 더 보수적이라, 가격표가 카드에 실리는 사고를 막아준다.
@@ -401,6 +445,7 @@ def extract_product(
         price_source=read.price_source or "",
         best_photo_index=read.best_photo_index or 0,
         photo_kinds=kinds,
+        photo_shows_product=shows,
         review_reason=read.review_reason or "",
         photo_paths=[str(p) for p in photo_paths],
         source_file_ids=list(source_file_ids or []),
@@ -456,7 +501,7 @@ def sanity_check(p: Product) -> Product:
         p.original_price = None
 
     if not p.has_product_photo:
-        reasons.append("상품이 보이는 사진이 없습니다 (가격표만 있는 정보용 사진)")
+        reasons.append("상품을 알아볼 수 있는 사진이 없습니다 (가격표만 찍힌 사진)")
 
     if p.sale_price is None:
         reasons.append("가격표에서 판매가를 읽지 못했습니다")

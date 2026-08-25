@@ -59,7 +59,7 @@ def test_price_tag_only_group_is_blocked():
     """가격표만 있으면 카드 배경으로 쓸 상품 사진이 없다."""
     p = product(photo_kinds=["price_tag"], photo_paths=["a.jpg"], best_photo_index=0)
     assert not p.publishable
-    assert "상품이 보이는 사진이 없습니다" in p.review_reason
+    assert "알아볼 수 있는 사진이 없습니다" in p.review_reason
 
 
 def test_absurd_discount_is_blocked():
