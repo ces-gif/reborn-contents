@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .llm import LLMClient, image_part, text_part
 
@@ -562,6 +562,247 @@ def save_products(products: list[Product], path: Path) -> Path:
     )
     return path
 
+
+
+# ------------------------------------------------ 한 번에 다 보고 판단하기 (통판독)
+#
+# 은성님: "클로드 코워크에서 했던 거에 비해 너무 형편없어."
+#
+# 맞는 지적이었다. 코워크에서는 사진 스무 장을 **한꺼번에 펼쳐놓고** 사람처럼
+# 봤다 — "이 가격표는 저 물건 거네, 이건 흐리니 옆 사진 쓰자". 자동화하면서
+# 그걸 좁은 질문 네 개로 쪼갰다:
+#   ① 사진마다 종류만 묻기 → ② 그 답으로 규칙 코드가 짝짓기 →
+#   ③ 묶음별로 이름·가격 묻기 → ④ 사진 한 장씩 다시 검문
+# 매 단계는 앞 단계가 버린 것을 되살릴 수 없다. ②에서 짝이 어긋나면
+# ③④가 아무리 잘해도 못 고친다(08-25 일산: 23장 → 묶음 22개).
+#
+# 그래서 코워크가 하던 대로 되돌린다. 한 매장의 그날 사진을 **전부 한 번에**
+# 보여주고, 묶기·이름·가격·카드에 쓸 사진까지 한 번에 결정하게 한다.
+# 실패하면 예전 4단계 방식으로 물러난다 — 새 방식이 안 되는 날에도 카드는 나와야 한다.
+
+PLAN_SYSTEM = """당신은 리퍼브 매장의 콘텐츠 담당자입니다.
+오늘 매장에서 찍은 사진을 **전부 한 번에** 받았습니다.
+이 사진들을 상품별로 정리해서 카드뉴스에 쓸 정보를 만들어 주세요.
+
+이 매장은 리퍼브(검수를 마친 새 상품) 전문점입니다. "중고"라는 단어는 절대 쓰지 않습니다.
+
+## 사진이 찍힌 방식
+직원이 상품 하나를 처리할 때 보통 이렇게 찍습니다.
+  · 상품 사진 1장 + 그 상품의 가격표 사진 1장 (순서는 그때그때 다릅니다)
+  · 또는 상품과 가격표가 한 장에 같이 나온 사진 1장
+  · 가끔 각도를 바꿔 2~3장 더 찍습니다
+사진은 **찍은 순서대로** 드립니다. 그래서 대개 이웃한 사진이 같은 상품입니다.
+하지만 순서만 믿지 마세요. **가격표에 적힌 상품명과 사진 속 물건이 같은지**
+직접 보고 판단하세요. 실제로 가격표를 찍은 뒤 다음 상품을 먼저 찍는 일이 잦습니다.
+
+## 해야 할 일
+1. 사진 한 장 한 장이 무엇인지 적습니다 (kind, shows_product).
+2. 같은 상품의 사진끼리 묶습니다.
+3. 묶음마다 가격표를 읽어 상품명·가격을 적습니다.
+4. 묶음마다 **카드뉴스 배경으로 쓸 사진 한 장**을 고릅니다.
+
+## 절대 규칙
+1. 가격은 사진 속 가격표·POP 에 **실제로 적혀 있는 숫자**만 씁니다.
+   추정하거나 검색하거나 상식으로 지어내지 않습니다.
+   정가와 할인가가 둘 다 보이면 둘 다, 하나만 보이면 그 하나만 적고 나머지는 null.
+   가격을 하나도 못 읽으면 review_reason 에 적습니다.
+2. **상품 상태를 지어내지 않습니다.** "미사용", "전시상품", "박스만 개봉",
+   "새것 같은" 같은 표현은 **가격표에 그렇게 적혀 있을 때만** condition_note 에
+   그대로 옮겨 적습니다. 없으면 반드시 빈 문자열입니다.
+   박스가 보인다거나 깨끗해 보인다는 이유로 상태를 단정하지 않습니다.
+3. 상품명은 가격표 표기를 우선합니다. 가격표에 없으면 사진 속 브랜드·로고·모델명으로.
+4. tag_text 에는 가격표에서 읽은 글자를 보이는 대로 옮겨 적습니다 (나중에 근거 확인용).
+
+## 카드에 쓸 사진 고르기 (가장 중요합니다)
+카드뉴스 배경은 손님이 보고 "아, 저 물건이구나" 하고 알아볼 수 있어야 합니다.
+가격표 사진이 배경으로 나가면 광고가 아니라 사고입니다. 실제로 그런 사고가 났습니다.
+
+고르는 법: 사진에서 **가격표를 손으로 가린다고 상상**하고, 남는 것을 봅니다.
+그 남은 것을 보고 물건 이름을 댈 수 있으면 그 사진을 쓸 수 있습니다.
+
+기준은 "물건 전체가 다 나왔는가"가 **아니라** "무슨 물건인지 알 수 있는가"입니다.
+매장 사진은 가까이서 찍혀 물건이 화면 밖으로 잘리는 일이 흔합니다. 잘렸어도
+"노란 아기욕조", "검은 카시트", "접이식 쇼핑카트"처럼 이름을 댈 수 있으면 씁니다.
+
+쓸 수 없는 사진은 이런 것뿐입니다:
+  · 가격표가 사진의 주인공이다 (가격표를 찍은 사진이다)
+  · 가격표를 가리면 흰 상자면·벽·바닥·천처럼 정체를 알 수 없는 면만 남는다
+후보가 여러 장이면 상품이 가장 잘 보이는 사진을 고릅니다.
+쓸 수 있는 사진이 하나도 없으면 card_photo_index 를 0 으로 두세요.
+
+## 사진을 빠뜨리지 마세요
+받은 사진은 **한 장도 빠짐없이** photos 에 나와야 합니다.
+매장 전경처럼 상품과 무관한 사진은 kind="other" 로 두고 어느 묶음에도 넣지 않습니다.
+그 외의 사진은 반드시 어느 한 상품의 photo_indexes 에 들어가야 합니다.
+상품 하나가 통째로 빠지면 그날 팔 물건 하나를 못 알리는 것입니다."""
+
+
+class PlannedPhoto(BaseModel):
+    """사진 한 장에 대한 판단."""
+
+    index: int = Field(description="사진 번호 (1부터)")
+    kind: str = Field(description="product / price_tag / both / other 중 하나")
+    shows_product: bool = Field(
+        default=False,
+        description="가격표를 가려도 무슨 물건인지 알 수 있으면 true",
+    )
+    note: str = Field(default="", description="사진에 보이는 것을 짧게. 예: '노란 아기욕조 근접'")
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value):
+        text = str(value or "").strip().lower()
+        if text in ("product", "price_tag", "both", "other"):
+            return text
+        if "tag" in text or "price" in text:
+            return "price_tag"
+        if "both" in text:
+            return "both"
+        if "other" in text:
+            return "other"
+        return "product"
+
+
+class PlannedProduct(BaseModel):
+    """상품 하나 — 어떤 사진들이 이 상품이고, 가격표에 뭐라고 적혀 있는지."""
+
+    photo_indexes: list[int] = Field(description="이 상품의 사진 번호들 (1부터)")
+    card_photo_index: int = Field(
+        description="카드뉴스 배경으로 쓸 사진 번호. 쓸 만한 사진이 없으면 0."
+    )
+    product_name: str = Field(description="가격표에 적힌 상품명 그대로. 없으면 브랜드/모델명.")
+    tag_text: str = Field(default="", description="가격표에서 읽은 글자 그대로")
+    condition_note: str = Field(
+        default="", description="가격표에 적힌 상태 표기만 그대로. 없으면 빈 문자열."
+    )
+    category: str = Field(
+        default="기타", description="가전 / 가구 / 주방 / 홈리빙 / 육아 / 반려 / 기타"
+    )
+    original_price: int | None = Field(default=None, description="가격표의 할인 전 가격. 없으면 null.")
+    sale_price: int | None = Field(default=None, description="가격표의 판매가. 없으면 null.")
+    discount_pct: int | None = Field(default=None, description="가격표에 적힌 할인율. 없으면 null.")
+    price_source: str = Field(default="", description="가격을 어느 사진에서 읽었는지")
+    review_reason: str = Field(default="", description="사람이 봐야 할 이유. 없으면 빈 문자열.")
+
+    @field_validator("photo_indexes", mode="before")
+    @classmethod
+    def _indexes(cls, value):
+        if value is None:
+            return []
+        if isinstance(value, int):
+            return [value]
+        out = []
+        for item in value:
+            try:
+                out.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+
+class StorePlan(BaseModel):
+    photos: list[PlannedPhoto] = Field(description="받은 사진 전부. 빠뜨리지 말 것.")
+    products: list[PlannedProduct] = Field(description="정리한 상품들. 찍은 순서대로.")
+
+
+def plan_store_photos(
+    client: LLMClient,
+    photo_paths: list[Path],
+    *,
+    model: str,
+    source_kind: str = "refurb",
+    store_name: str = "",
+) -> StorePlan:
+    """사진 전부를 한 번에 보여주고 상품별로 정리하게 한다."""
+    parts: list[dict] = []
+    for i, path in enumerate(photo_paths, start=1):
+        parts.append(text_part(f"[{i}번 사진]"))
+        parts.append(image_part(path))
+    note = SOURCE_NOTES.get(source_kind, SOURCE_NOTES["refurb"])
+    where = f"{store_name} " if store_name else ""
+    parts.append(
+        text_part(
+            f"{where}오늘 올라온 사진 {len(photo_paths)}장입니다 (찍은 순서).\n"
+            f"{note}\n"
+            "사진을 전부 훑어본 뒤 상품별로 정리해 주세요. "
+            "한 장도 빠뜨리지 말고, 카드에 쓸 사진은 가격표를 가려도 "
+            "무슨 물건인지 알 수 있는 사진으로 골라 주세요."
+        )
+    )
+    return client.structured(
+        system=PLAN_SYSTEM,
+        parts=parts,
+        schema=StorePlan,
+        max_tokens=16000,
+        model=model,
+    )
+
+
+def products_from_plan(
+    plan: StorePlan,
+    photo_paths: list[Path],
+    file_ids: list[str],
+    *,
+    source_name: str = "상품",
+    source_kind: str = "refurb",
+    eyebrow: str = "오늘의 리본 특가",
+    start_index: int = 1,
+) -> list[Product]:
+    """통판독 결과를 파이프라인이 쓰는 Product 로 옮긴다."""
+    n = len(photo_paths)
+    kinds = {p.index: p.kind for p in plan.photos if 1 <= p.index <= n}
+    shows = {p.index: bool(p.shows_product) for p in plan.photos if 1 <= p.index <= n}
+
+    products: list[Product] = []
+    used: set[int] = set()
+    for offset, planned in enumerate(plan.products):
+        indexes = [i for i in planned.photo_indexes if 1 <= i <= n and i not in used]
+        if not indexes:
+            continue
+        used.update(indexes)
+        local_paths = [photo_paths[i - 1] for i in indexes]
+        local_kinds = [kinds.get(i, "product") for i in indexes]
+        local_shows = [shows.get(i, False) for i in indexes]
+
+        card = 0
+        if planned.card_photo_index in indexes:
+            card = indexes.index(planned.card_photo_index) + 1
+            local_shows[card - 1] = True  # 카드로 고른 사진은 상품이 보인다는 뜻이다
+
+        product = Product(
+            product_name=planned.product_name,
+            category=planned.category or "기타",
+            tag_text=planned.tag_text or "",
+            condition_note=planned.condition_note or "",
+            original_price=planned.original_price,
+            sale_price=planned.sale_price,
+            discount_pct=planned.discount_pct,
+            price_source=planned.price_source or "",
+            best_photo_index=card,
+            photo_kinds=local_kinds,
+            photo_shows_product=local_shows,
+            review_reason=planned.review_reason or "",
+            photo_paths=[str(p) for p in local_paths],
+            source_file_ids=[file_ids[i - 1] for i in indexes] if file_ids else [],
+            group_index=start_index + offset,
+            source_name=source_name,
+            source_kind=source_kind,
+            eyebrow=eyebrow,
+        )
+        if card == 0:
+            product.review_reason = "; ".join(
+                filter(None, [product.review_reason, "상품을 알아볼 수 있는 사진이 없습니다"])
+            )
+        products.append(sanity_check(product))
+
+    missed = [
+        i
+        for i in range(1, n + 1)
+        if i not in used and kinds.get(i, "product") != "other"
+    ]
+    if missed:
+        log.warning("통판독이 사진 %s번을 어느 상품에도 넣지 않았습니다", ", ".join(map(str, missed)))
+    return products
 
 # ------------------------------------------------ 카드에 쓸 사진 검문 (마지막 관문)
 

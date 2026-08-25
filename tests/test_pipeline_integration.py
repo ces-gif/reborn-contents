@@ -48,13 +48,16 @@ class FakeDrive:
 class FakeLLM:
     """LLMClient 흉내. schema 클래스 이름으로 응답을 고른다."""
 
-    def __init__(self, kinds_per_group=None, classify_kinds=None):
+    def __init__(self, kinds_per_group=None, classify_kinds=None, plan_kinds=None):
         self.calls: list[str] = []
         self.kinds_per_group = kinds_per_group  # [["price_tag"], ["price_tag","product"], ...]
         # 1차 판독(사진 한 장씩 가격표/상품 구분)이 돌려줄 답을 준 순서대로 꺼내 쓴다
         self.classify_kinds = list(classify_kinds or [])
+        # 통판독(StorePlan)이 낼 답. None 이면 통판독을 실패시켜 예전 방식으로 물러나게 한다.
+        self.plan_kinds = plan_kinds
         self.assigned: list[str] = []  # 1차 판독에서 실제로 내준 답 (2차 판독도 같은 답을 낸다)
         self.searched: list[str] = []
+        self.product_count = 0
         self.name = "fake"
         self.vision_model = "fake-vision"
         self.writing_model = "fake-writing"
@@ -64,6 +67,47 @@ class FakeLLM:
         self.calls.append(name)
         if search:
             self.searched.append(name)
+
+        if name == "StorePlan":
+            if self.plan_kinds is None:
+                raise RuntimeError("이 테스트는 통판독을 쓰지 않습니다")
+            kinds = list(self.plan_kinds)
+            photos = [
+                vision.PlannedPhoto(
+                    index=i + 1, kind=k, shows_product=k in ("product", "both")
+                )
+                for i, k in enumerate(kinds)
+            ]
+            products, bucket = [], []
+            for i, k in enumerate(kinds, start=1):
+                bucket.append((i, k))
+                closes = k == "both" or (
+                    k == "price_tag" and any(x in ("product", "both") for _, x in bucket)
+                )
+                if closes:
+                    products.append(bucket)
+                    bucket = []
+            if bucket:
+                products.append(bucket)
+            planned = []
+            for n, bucket in enumerate(products, start=1):
+                card = next(
+                    (i for i, k in bucket if k in ("product", "both")), 0
+                )
+                planned.append(
+                    vision.PlannedProduct(
+                        photo_indexes=[i for i, _ in bucket],
+                        card_photo_index=card,
+                        product_name=f"쿠쿠 {n}호 밥솥",
+                        tag_text="온라인가 200,000 / 리본가 100,000",
+                        category="가전",
+                        original_price=200000,
+                        sale_price=100000,
+                        price_source="가격표",
+                    )
+                )
+            self.product_count += len(planned)
+            return vision.StorePlan(photos=photos, products=planned)
 
         if name == "PhotoBatch":
             images = [p for p in parts if p["type"] == "image"]
@@ -133,7 +177,7 @@ class FakeLLM:
             return ranking.Ranking(ranking=[ranking.RankedItem(id=0, why="할인 폭이 큽니다")])
 
         if name == "PostDraft":
-            n = sum(1 for c in self.calls if c == "ProductRead")
+            n = sum(1 for c in self.calls if c == "ProductRead") or self.product_count
             return blog.PostDraft(
                 category_tag="오늘의 리본 특가",
                 title="평택 리퍼브 가전 BEST",
@@ -420,3 +464,52 @@ def test_a_social_failure_does_not_throw_away_the_cards(wired, monkeypatch):
     )
     assert len(result.cards) == 3
     assert any("소셜" in f for f in result.step_failures)
+
+
+# ---------------------------------------------------------------- 통판독으로 도는 길
+
+
+@pytest.fixture
+def wired_onepass(wired, monkeypatch):
+    """같은 사진을 '한 번에 다 보고 판단하는' 길로 돌린다."""
+    drive, client, tmp_path = wired
+    client.plan_kinds = ["product", "price_tag", "both", "both"]
+    return drive, client, tmp_path
+
+
+def _run(tmp_path):
+    settings = load_settings()
+    settings.logo_file_id = "LOGO"
+    return pipeline.run(
+        settings,
+        day=date(2026, 8, 23),
+        out_root=tmp_path / "out",
+        work_root=tmp_path / "work",
+    )
+
+
+def test_통판독으로_돌면_사진을_한_번만_본다(wired_onepass):
+    drive, client, tmp_path = wired_onepass
+    result = _run(tmp_path)
+
+    # 사진을 넷으로 쪼개 묻던 호출이 사라진다
+    assert "StorePlan" in client.calls
+    assert "PhotoBatch" not in client.calls
+    assert "ProductRead" not in client.calls
+
+    # 리퍼 3장 → 상품 2개, 새상품 1장 → 상품 1개
+    assert len(result.products) == 3
+    assert len(result.cards) == 3
+    for product in result.products:
+        assert product.sale_price == 100000
+        assert product.best_photo.exists()
+
+
+def test_통판독이_안_되면_예전_방식으로_카드를_만든다(wired):
+    """새 방식이 실패하는 날에도 카드는 나와야 한다."""
+    drive, client, tmp_path = wired
+    client.plan_kinds = None  # StorePlan 호출이 예외를 던진다
+    result = _run(tmp_path)
+
+    assert "PhotoBatch" in client.calls  # 예전 길로 물러났다
+    assert len(result.cards) == 3

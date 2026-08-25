@@ -35,6 +35,8 @@ from .vision import (
     classify_photos,
     extract_product,
     pick_card_photo,
+    plan_store_photos,
+    products_from_plan,
     save_products,
 )
 
@@ -67,6 +69,7 @@ class RunResult:
     stories: instagram.PublishReport | None = None
     skipped_reason: str | None = None
     quota_note: str | None = None
+    reading_mode: str = ""  # 사진을 어떻게 읽었는지 (통판독 / 예전 방식)
     failed_groups: int = 0
     # 카드뉴스 뒤에 붙는 단계(블로그·소셜 등)가 넘어진 기록. 발행 자체는 계속한다.
     step_failures: list[str] = field(default_factory=list)
@@ -260,6 +263,44 @@ def run(
             paths_by_id[file.id] = dest
 
         photo_paths = [paths_by_id[f.id] for f in files]
+
+        # ── 통판독: 사진 전부를 한 번에 보여주고 상품별로 정리하게 한다 ──
+        # 좁은 질문 넷으로 쪼개던 예전 방식은 앞 단계가 버린 정보를 되살릴 수
+        # 없었다. 여기서 성공하면 묶기·이름·가격·카드 사진이 한 번에 끝난다.
+        planned = _plan_products(
+            client,
+            photo_paths,
+            [f.id for f in files],
+            source=source,
+            store_name=settings.store_name,
+            limit=remaining,
+        )
+        if planned is not None:
+            result.reading_mode = "한 번에 전부 보고 판단"
+            if remaining is not None:
+                remaining -= len(planned)
+            result.groups += len(planned)
+            log.info("[%s] 사진 %d장 → 상품 %d개 (통판독)", source.name, len(files), len(planned))
+            for product in planned:
+                log.info(
+                    "  [%s %02d] %s | 사진 %s | %s → %s | 검토필요=%s %s",
+                    source.name,
+                    product.group_index,
+                    product.product_name,
+                    "+".join(product.photo_kinds),
+                    product.original_price,
+                    product.sale_price,
+                    product.needs_review,
+                    product.review_reason,
+                )
+                result.products.append(product)
+                if not product.publishable:
+                    result.needs_review.append(product)
+            continue
+
+        # ── 통판독이 안 되면 예전 4단계 방식으로 물러난다 ──
+        log.warning("[%s] 통판독이 안 돼서 예전 방식(분류→묶기→판독)으로 진행합니다", source.name)
+        result.reading_mode = "예전 방식(분류→묶기→판독)"
         classes = classify_photos(client, photo_paths, model=client.vision_model)
         kinds = [c.kind for c in classes]
         items = [c.item for c in classes]
@@ -473,6 +514,54 @@ def _find_publish_root(drive: Drive, settings: Settings) -> str | None:
     return drive.find_child(parent, settings.publish_folder_name)
 
 
+def _plan_products(
+    client,
+    photo_paths: list[Path],
+    file_ids: list[str],
+    *,
+    source,
+    store_name: str,
+    limit: int | None,
+) -> list | None:
+    """사진 전부를 한 번에 보고 상품 목록을 만든다. 안 되면 None.
+
+    코워크에서 하던 방식이다 — 스무 장을 펼쳐놓고 한 사람이 다 본다.
+    실패(모델 오류·결과가 비었음)하면 None 을 돌려 예전 방식으로 넘긴다.
+    카드가 안 나오는 날이 있어선 안 되기 때문이다.
+    """
+    if not photo_paths:
+        return None
+    try:
+        plan = plan_store_photos(
+            client,
+            photo_paths,
+            model=client.vision_model,
+            source_kind=source.kind,
+            store_name=store_name,
+        )
+    except LLMQuotaError:
+        raise
+    except Exception as exc:
+        log.warning("통판독 실패: %s", exc)
+        return None
+
+    products = products_from_plan(
+        plan,
+        photo_paths,
+        file_ids,
+        source_name=source.name,
+        source_kind=source.kind,
+        eyebrow=source.eyebrow,
+    )
+    if not products:
+        log.warning("통판독이 상품을 하나도 못 찾았습니다")
+        return None
+    if limit is not None and len(products) > limit:
+        log.warning("상품 %d개 중 하루 상한(%d)만큼만 만듭니다", len(products), limit)
+        products = products[:limit]
+    return products
+
+
 def _place(src: Path, dest: Path) -> None:
     """받아둔 원본을 촬영 순서 번호가 붙은 이름으로 놓는다.
 
@@ -511,6 +600,8 @@ def _report(result: RunResult, settings: Settings) -> str:
         f"- 카드뉴스: {len(result.cards)}장",
         f"- 블로그: {'생성' if result.blog_files else '없음'}",
     ]
+    if result.reading_mode:
+        lines.insert(4, f"- 사진 판독: {result.reading_mode}")
     if result.failed_groups:
         lines.append(f"- ⚠️ 판독하지 못한 묶음: {result.failed_groups}개")
     for failure in result.step_failures:
