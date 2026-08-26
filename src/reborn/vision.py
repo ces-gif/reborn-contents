@@ -493,6 +493,28 @@ def strip_unevidenced_claims(text: str, tag_text: str) -> str:
     return " ".join(kept).strip(" ,·-–—")
 
 
+_TRAILING_PAREN = re.compile(r"\s*[(（]\s*([^()（）]{1,20})\s*[)）]\s*$")
+
+
+def _drop_repeated_condition(name: str, note: str) -> str:
+    """상품명 끝의 괄호가 상태 표기와 같은 말이면 떼어낸다.
+
+    이름이 통째로 사라지지는 않게 한다 — 괄호를 떼고 남는 게 없으면 그대로 둔다.
+    """
+    name = (name or "").strip()
+    note = (note or "").strip()
+    if not name or not note:
+        return name
+    match = _TRAILING_PAREN.search(name)
+    if not match:
+        return name
+    inside = match.group(1).strip()
+    if inside != note and inside not in note and note not in inside:
+        return name
+    trimmed = name[: match.start()].strip()
+    return trimmed or name
+
+
 def sanity_check(p: Product) -> Product:
     """모델이 실수했을 때 잘못된 값이 조용히 카드에 찍히는 것을 막는다.
 
@@ -531,6 +553,11 @@ def sanity_check(p: Product) -> Product:
     pct = p.computed_pct
     if pct is not None and not (0 < pct < 95):
         reasons.append(f"할인율이 비정상입니다({pct}%)")
+
+    # 상태 표기가 상품명 끝에 괄호로 또 붙어 있으면 이름 쪽을 지운다.
+    # 직원이 가격표에 "…화이트 사각5단(까짐)" 처럼 적으면 카드에 상품명과
+    # 상태 뱃지 양쪽에 "까짐" 이 두 번 나온다.
+    p.product_name = _drop_repeated_condition(p.product_name, p.condition_note)
 
     # 가격표에 근거 없는 상태 표현은 걷어낸다
     p.condition_note = strip_unevidenced_claims(p.condition_note, p.evidence_text)
