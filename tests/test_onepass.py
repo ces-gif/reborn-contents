@@ -157,3 +157,50 @@ def test_가격표에_없는_상태는_지운다():
     )
     (product,) = products_from_plan(plan, _paths(1), ["a"])
     assert product.condition_note == ""
+
+
+# ------------------------------------------------ 가격표가 이 상품 것인가
+
+
+def _one(**kw):
+    base = dict(photo_indexes=[1], card_photo_index=1, product_name="스팀다리미", sale_price=10000)
+    base.update(kw)
+    return _plan([PlannedProduct(**base)], n=1)
+
+
+def test_한_사진에_다른_물건이_같이_찍혔다는_설명만으로는_안_막는다():
+    """08-27 사고: '다른 상품도 함께 찍혀 있으나 가격표는 이것으로 확인됨' 이
+    '다른 상품' 이라는 말 때문에 발행이 막혔다."""
+    plan = _one(
+        review_reason="다른 상품(에어쿨러, 휴지통 등)도 함께 찍혀 있으나, 가격표는 이 스팀다리미 것으로 확인됨",
+        price_tag_matches=True,
+    )
+    (product,) = products_from_plan(plan, _paths(1), ["a"])
+    assert product.publishable
+    assert "다른 상품" in product.cautions  # 리포트에는 남는다
+
+
+def test_가격표가_다른_물건_것이면_막는다():
+    plan = _one(review_reason="가격표가 옆 상품 것으로 보임", price_tag_matches=False)
+    (product,) = products_from_plan(plan, _paths(1), ["a"])
+    assert not product.publishable
+    assert "가격표가 이 상품의 것이 아닐" in product.review_reason
+
+
+def test_예전_방식은_사유_문장으로_판단한다():
+    """통판독이 아닌 길(tag_matches 를 모름)에서는 예전대로 문장을 본다."""
+    from reborn.vision import Product, sanity_check
+
+    p = sanity_check(
+        Product(
+            product_name="가",
+            category="기타",
+            sale_price=1000,
+            photo_paths=["a.jpg"],
+            photo_kinds=["both"],
+            photo_shows_product=[True],
+            best_photo_index=1,
+            review_reason="상품과 가격표가 서로 다른 물건입니다",
+        )
+    )
+    assert not p.publishable

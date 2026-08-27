@@ -241,6 +241,9 @@ class Product:
     needs_review: bool = False
     photo_shows_product: list[bool] = field(default_factory=list)
     review_reason: str = ""      # 발행을 막는 사유
+    # 가격표가 이 상품의 것이 맞는가. None 이면 명시적인 답이 없어
+    # 사유 문장을 훑어 판단한다(예전 방식).
+    tag_matches: bool | None = None
     cautions: str = ""           # 카드는 만들되 사람이 한 번 볼 만한 것
 
     # 웹 검색으로 채워지는 부분 (research.py)
@@ -525,8 +528,14 @@ def sanity_check(p: Product) -> Product:
     """
     reasons: list[str] = []
     cautions: list[str] = []
+    if p.tag_matches is False:
+        reasons.append("가격표가 이 상품의 것이 아닐 수 있습니다")
     if p.review_reason:
-        (reasons if _blocks_publishing(p.review_reason) else cautions).append(p.review_reason)
+        # 명시적인 답이 있으면 그걸 믿는다. 사유 문장을 훑는 방식은 오판이 있었다 —
+        # "다른 상품(에어쿨러 등)도 함께 찍혀 있으나 가격표는 이 스팀다리미 것으로
+        # 확인됨" 처럼 **의심을 푸는 문장**이 '다른 상품' 이라는 말 때문에 발행을 막았다.
+        blocks = _blocks_publishing(p.review_reason) if p.tag_matches is None else False
+        (reasons if blocks else cautions).append(p.review_reason)
 
     if p.sale_price is not None and p.sale_price <= 0:
         p.sale_price = None
@@ -709,6 +718,14 @@ class PlannedProduct(BaseModel):
     discount_pct: int | None = Field(default=None, description="가격표에 적힌 할인율. 없으면 null.")
     price_source: str = Field(default="", description="가격을 어느 사진에서 읽었는지")
     review_reason: str = Field(default="", description="사람이 봐야 할 이유. 없으면 빈 문자열.")
+    price_tag_matches: bool = Field(
+        default=True,
+        description=(
+            "이 가격표가 정말 이 상품의 것이면 true. 다른 물건의 가격표가 섞였다고 "
+            "의심되면 false. 한 사진에 다른 물건이 같이 찍힌 것만으로는 false 가 아니다 — "
+            "가격표에 적힌 상품명과 카드에 쓸 상품이 서로 다른 물건일 때만 false."
+        ),
+    )
 
     @field_validator("photo_indexes", mode="before")
     @classmethod
@@ -808,6 +825,7 @@ def products_from_plan(
             photo_kinds=local_kinds,
             photo_shows_product=local_shows,
             review_reason=planned.review_reason or "",
+            tag_matches=bool(planned.price_tag_matches),
             photo_paths=[str(p) for p in local_paths],
             source_file_ids=[file_ids[i - 1] for i in indexes] if file_ids else [],
             group_index=start_index + offset,
