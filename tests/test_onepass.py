@@ -204,3 +204,27 @@ def test_예전_방식은_사유_문장으로_판단한다():
         )
     )
     assert not p.publishable
+
+
+# ------------------------------------------------ 사진이 많을 때 나눠 보기
+
+
+def test_사진이_많으면_고르게_나눈다():
+    from reborn.pipeline import PLAN_CHUNK, _chunks
+
+    assert _chunks(20, 24) == [(0, 20)]
+    assert _chunks(24, 24) == [(0, 24)]
+    # 38장이면 25/13 이 아니라 19/19 로 고르게
+    assert _chunks(38, 24) == [(0, 19), (19, 38)]
+    assert _chunks(50, 24) == [(0, 17), (17, 34), (34, 50)]
+    assert PLAN_CHUNK == 24
+
+
+def test_나눈_덩어리는_모든_사진을_한_번씩만_덮는다():
+    from reborn.pipeline import _chunks
+
+    for n in (1, 7, 24, 25, 38, 60, 97):
+        spans = _chunks(n, 24)
+        covered = [i for start, end in spans for i in range(start, end)]
+        assert covered == list(range(n)), n
+        assert all(end - start <= 24 for start, end in spans), n

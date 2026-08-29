@@ -515,6 +515,28 @@ def _find_publish_root(drive: Drive, settings: Settings) -> str | None:
     return drive.find_child(parent, settings.publish_folder_name)
 
 
+# 한 번에 넘기는 사진 수의 상한.
+# 08-29 평택은 38장이었는데 통판독이 실패해 예전 방식으로 물러났다.
+# 사진이 많아지면 한 번의 호출이 감당하지 못한다. 그래서 **찍은 순서대로**
+# 잘라서 여러 번 통판독한다. 자르는 자리에서 상품 하나가 갈라질 수 있지만
+# 그건 경계마다 최대 한 개고, 통째로 예전 방식으로 물러나는 것보다 훨씬 낫다.
+PLAN_CHUNK = 24
+
+
+def _chunks(n: int, size: int) -> list[tuple[int, int]]:
+    """0..n 을 size 이하의 덩어리로 고르게 나눈 (시작, 끝) 목록."""
+    if n <= size:
+        return [(0, n)]
+    parts = -(-n // size)  # 올림
+    base, extra = divmod(n, parts)
+    out, start = [], 0
+    for i in range(parts):
+        end = start + base + (1 if i < extra else 0)
+        out.append((start, end))
+        start = end
+    return out
+
+
 def _plan_products(
     client,
     photo_paths: list[Path],
@@ -524,36 +546,52 @@ def _plan_products(
     store_name: str,
     limit: int | None,
 ) -> list | None:
-    """사진 전부를 한 번에 보고 상품 목록을 만든다. 안 되면 None.
+    """사진을 한 번에 보고 상품 목록을 만든다. 안 되면 None.
 
     코워크에서 하던 방식이다 — 스무 장을 펼쳐놓고 한 사람이 다 본다.
-    실패(모델 오류·결과가 비었음)하면 None 을 돌려 예전 방식으로 넘긴다.
-    카드가 안 나오는 날이 있어선 안 되기 때문이다.
+    사진이 PLAN_CHUNK 보다 많으면 찍은 순서대로 잘라서 여러 번 본다.
+    한 덩어리라도 실패하면 None 을 돌려 예전 방식으로 넘긴다 —
+    그 덩어리의 사진이 조용히 사라지는 것보다 낫다.
     """
     if not photo_paths:
         return None
-    try:
-        plan = plan_store_photos(
-            client,
-            photo_paths,
-            model=client.vision_model,
-            source_kind=source.kind,
-            store_name=store_name,
-        )
-    except LLMQuotaError:
-        raise
-    except Exception as exc:
-        log.warning("통판독 실패: %s", exc)
-        return None
 
-    products = products_from_plan(
-        plan,
-        photo_paths,
-        file_ids,
-        source_name=source.name,
-        source_kind=source.kind,
-        eyebrow=source.eyebrow,
-    )
+    products: list = []
+    spans = _chunks(len(photo_paths), PLAN_CHUNK)
+    if len(spans) > 1:
+        log.info("사진 %d장 → %d번에 나눠 통판독합니다", len(photo_paths), len(spans))
+    for start, end in spans:
+        paths = photo_paths[start:end]
+        ids = file_ids[start:end]
+        try:
+            plan = plan_store_photos(
+                client,
+                paths,
+                model=client.vision_model,
+                source_kind=source.kind,
+                store_name=store_name,
+            )
+        except LLMQuotaError:
+            raise
+        except Exception as exc:
+            log.warning(
+                "통판독 실패 (사진 %d~%d번, %s): %s",
+                start + 1,
+                end,
+                type(exc).__name__,
+                exc,
+            )
+            return None
+        products += products_from_plan(
+            plan,
+            paths,
+            ids,
+            source_name=source.name,
+            source_kind=source.kind,
+            eyebrow=source.eyebrow,
+            start_index=len(products) + 1,
+        )
+
     if not products:
         log.warning("통판독이 상품을 하나도 못 찾았습니다")
         return None
