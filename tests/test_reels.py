@@ -156,3 +156,24 @@ def test_caption_is_trimmed_to_instagram_limit():
 
 def test_short_caption_is_left_alone():
     assert instagram.trim_caption("짧은 캡션") == "짧은 캡션"
+
+
+# ---------------------------------------------------------------- 저장 위치
+def test_reel_goes_next_to_the_cards_of_the_busiest_source():
+    """릴스는 카드가 가장 많이 나온 폴더(보통 '리퍼')에 함께 둔다."""
+    from reborn.pipeline import RunResult, _reel_folder
+
+    class FakeProduct:
+        def __init__(self, source_name):
+            self.source_name = source_name
+            self.publishable = True
+
+    result = RunResult(day="2026-09-05")
+    result.products = [FakeProduct("리퍼")] * 9 + [FakeProduct("새상품")] * 2
+    assert _reel_folder(result) == "리퍼"
+
+
+def test_reel_folder_defaults_to_refurb_when_nothing_published():
+    from reborn.pipeline import RunResult, _reel_folder
+
+    assert _reel_folder(RunResult(day="2026-09-05")) == "리퍼"

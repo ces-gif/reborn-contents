@@ -428,11 +428,12 @@ def run(
 
         # 영상은 인스타 설정과 상관없이 만들어 둔다. 자동 게시가 막힌 날에도
         # 드라이브에 영상이 있으면 손으로 올릴 수 있다.
+        # 카드와 같은 폴더(카드뉴스/리퍼)에 둔다 — 그날 결과물이 한자리에 모인다.
         try:
             frames = ([result.cover] if result.cover else []) + result.cards
             result.reel_video = reels.build_slideshow(
                 frames,
-                out_dir / "릴스" / f"{day_slug}-릴스.mp4",
+                out_dir / "카드뉴스" / _reel_folder(result) / f"{day_slug}-릴스.mp4",
                 seconds_per_card=settings.reel_seconds_per_card,
             )
         except Exception as exc:
@@ -833,3 +834,13 @@ def _read_caption(result: "RunResult") -> str:
             except OSError:
                 break
     return ""
+
+
+def _reel_folder(result: "RunResult") -> str:
+    """릴스를 넣을 카드뉴스 하위 폴더. 카드가 가장 많이 나온 쪽(보통 '리퍼')."""
+    counts: dict[str, int] = {}
+    for product in result.published:
+        counts[product.source_name] = counts.get(product.source_name, 0) + 1
+    if not counts:
+        return "리퍼"
+    return slugify(max(counts, key=counts.get))
