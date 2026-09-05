@@ -1,4 +1,4 @@
-"""카드뉴스에 딸려 나가는 짧은 글: 카톡 오픈채팅 공지 / 인스타 캡션.
+"""카드뉴스에 딸려 나가는 짧은 글: 카톡 공지 / 인스타 캡션 / 릴스 캡션.
 
 모델을 부르지 않고 템플릿으로 만든다 (기존 스킬의 표기 습관을 그대로 반영).
 - 구조용 이모지만 사용 (✔ 📍 ✨)
@@ -90,3 +90,68 @@ def _hashtags(products: list[Product], handle: str) -> str:
         if t and t not in seen:
             seen.append(t)
     return " ".join(f"#{t}" for t in seen) + f" {handle}"
+
+
+# ---------------------------------------------------------------- 릴스 캡션
+# 피드 캡션과 다르다. 릴스는 **첫 줄만 보이고** 나머지는 "더 보기"에 접힌다.
+# 그래서 상품을 다 나열하지 않고 후킹 한 줄로 세운 뒤, 할인폭이 큰 셋만 보여준다.
+# 매장 실제 릴스 게시물에는 해시태그가 없어서 붙이지 않는다.
+HOOK_BY_CATEGORY = {
+    "주방": "주방 새로 채우지 마세요!",
+    "가구": "가구 새로 사지 마세요!",
+    "생활": "생활용품 정가 주고 사지 마세요!",
+    "가전": "가전 정가 주고 사지 마세요!",
+    "유아": "육아템 새로 사지 마세요!",
+}
+DEFAULT_HOOK = "정가 주고 사지 마세요!"
+REEL_HIGHLIGHTS = 3
+
+
+def _hook(products: list[Product]) -> str:
+    """가장 많이 나온 분류로 후킹을 고른다. 모르면 무난한 기본 문구."""
+    counts: dict[str, int] = {}
+    for p in products:
+        key = (p.category or "").strip()
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+    for category in sorted(counts, key=lambda c: -counts[c]):
+        for keyword, hook in HOOK_BY_CATEGORY.items():
+            if keyword in category:
+                return hook
+    return DEFAULT_HOOK
+
+
+def _biggest_savings(products: list[Product], count: int) -> list[Product]:
+    """할인 **금액**이 큰 순서. 퍼센트가 아니라 아낀 돈이 눈에 들어온다."""
+    priced = [p for p in products if p.original_price and p.original_price > p.sale_price]
+    priced.sort(key=lambda p: p.original_price - p.sale_price, reverse=True)
+    return priced[:count] or products[:count]
+
+
+def reel_caption(
+    products: list[Product],
+    *,
+    store_name: str,
+    address: str = "",
+    parking_note: str = "",
+) -> str:
+    """릴스에 붙일 캡션. 영상과 같은 폴더에 나란히 둔다."""
+    lines = [_hook(products), f"{store_name}에 오면 반값에 득템 가능해요.", ""]
+
+    for p in _biggest_savings(products, REEL_HIGHLIGHTS):
+        if p.original_price:
+            lines.append(f"{p.product_name} {p.sale_price:,}원 (원가 {p.original_price:,}원)")
+        else:
+            lines.append(f"{p.product_name} {p.sale_price:,}원")
+    lines += [
+        "",
+        "✔ 포장만 뜯긴 리퍼 새상품만 (중고 절대 X)",
+        "✔ 대표·직원이 1차·2차 직접 검수 완료",
+        "✔ 교환·환불 OK",
+        "",
+    ]
+    # 주소를 모르는 매장은 지어내지 않는다. 매장 이름만 남긴다.
+    lines.append(f"📍 {address}" if address else f"📍 {store_name}")
+    if parking_note:
+        lines.append(parking_note)
+    return "\n".join(lines).strip()

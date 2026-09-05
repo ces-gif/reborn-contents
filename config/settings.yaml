@@ -116,6 +116,9 @@ stores:
       handle: "@reborn.mk"
       footer_note: "매장 재고는 한정 수량, 소진 시 조기 종료됩니다"
       visit_line: "리본마켓 평택점 · 매장에서 직접 보고 구매하세요"
+      # 릴스 캡션 맨 아래 매장 안내. 비우면 매장 이름만 나간다 (주소를 지어내지 않는다).
+      address: "경기 평택시 이충로 49-29 103호 리본마켓"
+      parking_note: "*건물 건너편 무료 공영주차장 있음!"
     card:
       sale_label: "리본마켓 초특가"
 
@@ -144,5 +147,8 @@ stores:
       handle: "@foxmarket.ils"
       footer_note: "매장 재고는 한정 수량, 소진 시 조기 종료됩니다"
       visit_line: "여우마켓 일산점 · 매장에서 직접 보고 구매하세요"
+      # 일산 주소는 아직 확인 전이라 비워 둔다. 채우면 그날부터 릴스 캡션에 들어간다.
+      address: ""
+      parking_note: ""
     card:
       sale_label: "여우마켓 초특가"

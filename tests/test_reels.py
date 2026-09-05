@@ -192,3 +192,73 @@ def test_reel_build_failure_is_reported_not_silent(tmp_path, monkeypatch):
     result.step_failures.append(f"릴스 영상: {result.reel_error}")
 
     assert result.step_failures  # 깃허브 이슈로 알림이 가는 통로
+
+
+# ---------------------------------------------------------------- 릴스 캡션
+def _product(name, sale, orig=None, category="주방"):
+    from reborn.vision import Product
+
+    p = Product.__new__(Product)
+    p.product_name, p.sale_price, p.original_price = name, sale, orig
+    p.discount_pct, p.spec_line, p.condition_note = None, "", ""
+    p.category, p.source_name = category, "리퍼"
+    return p
+
+
+def test_reel_caption_leads_with_a_hook_not_a_product_list():
+    """릴스는 첫 줄만 보인다. 상품 나열로 시작하면 아무도 안 멈춘다."""
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("아이넥스 싱크선반 600", 63300, 126650)],
+        store_name="리본마켓 평택점",
+        address="경기 평택시 이충로 49-29 103호 리본마켓",
+        parking_note="*건물 건너편 무료 공영주차장 있음!",
+    )
+    first = caption.splitlines()[0]
+    assert first == "주방 새로 채우지 마세요!"
+    assert "63,300원" in caption and "126,650원" in caption
+    assert "경기 평택시" in caption
+
+
+def test_reel_caption_shows_the_three_biggest_savings():
+    """열두 개를 다 적으면 '더 보기' 뒤로 묻힌다. 아낀 돈이 큰 셋만."""
+    from reborn import social
+
+    products = [
+        _product("소소한절약", 9000, 10000),   # 1,000원 절약
+        _product("최대절약", 63300, 126650),   # 63,350원 절약
+        _product("중간절약", 19600, 48800),    # 29,200원 절약
+        _product("조금절약", 7400, 14800),     # 7,400원 절약
+    ]
+    caption = social.reel_caption(products, store_name="리본마켓 평택점")
+    assert "최대절약" in caption and "중간절약" in caption and "조금절약" in caption
+    # 가장 덜 아끼는 하나는 빠진다 — 셋만 보여준다
+    assert "소소한절약" not in caption
+
+
+def test_reel_caption_never_invents_an_address():
+    """주소를 모르는 매장(일산)에 평택 주소를 붙이면 손님이 헛걸음한다."""
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("원목 스툴", 7900, 15800)], store_name="여우마켓 일산점"
+    )
+    assert "📍 여우마켓 일산점" in caption
+    assert "평택" not in caption
+
+
+def test_reel_caption_has_no_hashtags():
+    """매장 실제 릴스에는 해시태그가 없다."""
+    from reborn import social
+
+    caption = social.reel_caption([_product("냄비", 22400, 44800)], store_name="리본마켓 평택점")
+    assert "#" not in caption
+
+
+def test_reel_caption_never_says_used():
+    from reborn import social
+
+    caption = social.reel_caption([_product("냄비", 22400, 44800)], store_name="리본마켓 평택점")
+    assert "중고 절대 X" in caption  # 중고가 아니라는 말은 해도 된다
+    assert "중고 상품" not in caption

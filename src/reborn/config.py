@@ -95,6 +95,8 @@ class Settings:
     reel_enabled: bool
     reel_seconds_per_card: float
     reel_headline: str
+    store_address: str
+    store_parking_note: str
 
     raw: dict = field(default_factory=dict, repr=False)
 
@@ -241,6 +243,8 @@ def _settings_from(data: dict) -> Settings:
             _env("REEL_SECONDS_PER_CARD", str(instagram.get("reel_seconds_per_card", 0.8)))
         ),
         reel_headline=_env("REEL_HEADLINE", instagram.get("reel_headline", "오늘의 추천템")),
+        store_address=_env("STORE_ADDRESS", store.get("address", "") or ""),
+        store_parking_note=_env("STORE_PARKING_NOTE", store.get("parking_note", "") or ""),
         raw=data,
     )
 

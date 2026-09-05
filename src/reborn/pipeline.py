@@ -71,6 +71,7 @@ class RunResult:
     cover: Path | None = None
     reel_video: Path | None = None
     reel_error: str = ""
+    reel_caption_file: Path | None = None
     skipped_reason: str | None = None
     quota_note: str | None = None
     reading_mode: str = ""  # 사진을 어떻게 읽었는지 (통판독 / 예전 방식)
@@ -430,11 +431,31 @@ def run(
         # 영상은 인스타 설정과 상관없이 만들어 둔다. 자동 게시가 막힌 날에도
         # 드라이브에 영상이 있으면 손으로 올릴 수 있다.
         # 카드와 같은 폴더(카드뉴스/리퍼)에 둔다 — 그날 결과물이 한자리에 모인다.
+        reel_dir = out_dir / "카드뉴스" / _reel_folder(result)
+
+        # 릴스 캡션은 영상과 같은 폴더에 나란히 둔다 — 올릴 때 둘을 같이 연다.
+        # 피드 캡션(소셜/…-인스타캡션.txt)과 다르다: 릴스는 첫 줄만 보이고
+        # 나머지는 접히므로 후킹으로 시작하고 상품을 다 나열하지 않는다.
+        try:
+            caption = social.reel_caption(
+                result.published,
+                store_name=settings.store_name,
+                address=settings.store_address,
+                parking_note=settings.store_parking_note,
+            )
+            reel_dir.mkdir(parents=True, exist_ok=True)
+            caption_path = reel_dir / f"{day_slug}-릴스캡션.txt"
+            caption_path.write_text(caption, encoding="utf-8")
+            result.reel_caption_file = caption_path
+        except Exception as exc:
+            result.step_failures.append(f"릴스 캡션: {exc}")
+            log.warning("릴스 캡션 생성 실패: %s", exc)
+
         try:
             frames = ([result.cover] if result.cover else []) + result.cards
             result.reel_video = reels.build_slideshow(
                 frames,
-                out_dir / "카드뉴스" / _reel_folder(result) / f"{day_slug}-릴스.mp4",
+                reel_dir / f"{day_slug}-릴스.mp4",
                 seconds_per_card=settings.reel_seconds_per_card,
             )
         except Exception as exc:
@@ -506,7 +527,7 @@ def run(
         if settings.reel_enabled and result.reel_video:
             result.reel = instagram.publish_reel_video(
                 result.reel_video,
-                caption=_read_caption(result),
+                caption=_reel_caption_text(result),
                 key_prefix=f"reels/{day_slug}",
                 cover=result.cover,
             )
@@ -856,3 +877,13 @@ def _reel_folder(result: "RunResult") -> str:
     if not counts:
         return "리퍼"
     return slugify(max(counts, key=counts.get))
+
+
+def _reel_caption_text(result: "RunResult") -> str:
+    """릴스에 붙일 캡션. 없으면 피드 캡션이라도 쓴다."""
+    if result.reel_caption_file and result.reel_caption_file.exists():
+        try:
+            return result.reel_caption_file.read_text(encoding="utf-8")
+        except OSError:
+            pass
+    return _read_caption(result)
