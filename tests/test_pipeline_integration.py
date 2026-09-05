@@ -40,7 +40,7 @@ class FakeDrive:
         dest.write_bytes(self.logo_bytes if file_id == "LOGO" else self.photo_bytes)
         return dest
 
-    def upload(self, path: Path, parent_id, mime_type=None, name=None):
+    def upload(self, path: Path, parent_id, mime_type=None, name=None, as_doc=False):
         self.uploaded[name or path.name] = path.read_bytes()
         return f"file-{name or path.name}"
 

@@ -33,6 +33,7 @@ class FakeDrive:
         self.existing = existing or {}
         self.trashed: list[str] = []
         self.uploaded: list[str] = []
+        self.as_docs: dict[str, bool] = {}
         self.folders: dict[tuple[str, str], str] = {}
 
     def list_children(self, folder_id, only_images=False, page_size=200):
@@ -41,8 +42,9 @@ class FakeDrive:
     def ensure_folder(self, name, parent_id=None):
         return self.folders.setdefault((parent_id, name), f"{parent_id}/{name}")
 
-    def upload(self, path: Path, parent_id, mime_type=None, name=None):
-        self.uploaded.append(f"{parent_id}/{path.name}")
+    def upload(self, path: Path, parent_id, mime_type=None, name=None, as_doc=False):
+        self.uploaded.append(f"{parent_id}/{name or path.name}")
+        self.as_docs[name or path.name] = as_doc
         return f"file-{path.name}"
 
     def trash(self, file_id):
@@ -103,3 +105,56 @@ def test_a_failed_cleanup_does_not_stop_publishing(tmp_path):
     drive = Grumpy()
     uploaded = upload_tree(drive, make_out(tmp_path), "DAY")
     assert "카드뉴스/01-새상품.png" in uploaded
+
+
+# ------------------------------------------------ 캡션은 구글 문서로 올라간다
+
+
+def doc_file(name: str) -> DriveFile:
+    dt = datetime(2026, 8, 23, tzinfo=timezone.utc)
+    return DriveFile(
+        id=f"id-{name}", name=name, mime_type="application/vnd.google-apps.document",
+        created_time=dt, modified_time=dt, size=10,
+    )
+
+
+def make_out_with_caption(tmp_path: Path) -> Path:
+    out = make_out(tmp_path)
+    (out / "카드뉴스" / "2026-09-05-릴스캡션.txt").write_text("후킹", encoding="utf-8")
+    return out
+
+
+def test_caption_txt_is_uploaded_as_a_google_doc(tmp_path):
+    """폰 드라이브 앱에서 txt 는 잘 안 열린다. 문서여야 그 자리에서 복사한다."""
+    drive = FakeDrive()
+    upload_tree(drive, make_out_with_caption(tmp_path), "DAY")
+    assert drive.as_docs["2026-09-05-릴스캡션"] is True
+    assert drive.as_docs["01-새상품.png"] is False
+
+
+def test_the_caption_doc_drops_the_txt_extension(tmp_path):
+    """구글 문서가 된 뒤에는 .txt 가 아니다. 이름에 남겨두면 헷갈린다."""
+    drive = FakeDrive()
+    upload_tree(drive, make_out_with_caption(tmp_path), "DAY")
+    assert "DAY/카드뉴스/2026-09-05-릴스캡션" in drive.uploaded
+    assert "DAY/카드뉴스/2026-09-05-릴스캡션.txt" not in drive.uploaded
+
+
+def test_yesterdays_caption_doc_is_not_trashed_by_todays_cleanup(tmp_path):
+    """이름이 어긋나면 방금 올린 문서를 정리가 도로 버린다. 실제로 위험했던 부분."""
+    drive = FakeDrive({
+        "DAY": [folder_file("카드뉴스")],
+        "DAY/카드뉴스": [doc_file("2026-09-05-릴스캡션"), plain_file("01-새상품.png")],
+    })
+    upload_tree(drive, make_out_with_caption(tmp_path), "DAY")
+    assert drive.trashed == []
+
+
+def test_a_leftover_txt_caption_is_cleaned_up(tmp_path):
+    """문서로 바꾸기 전에 올라간 txt 는 다음 실행 때 치운다. 둘이 나란히 있으면 헷갈린다."""
+    drive = FakeDrive({
+        "DAY": [folder_file("카드뉴스")],
+        "DAY/카드뉴스": [plain_file("2026-09-05-릴스캡션.txt")],
+    })
+    upload_tree(drive, make_out_with_caption(tmp_path), "DAY")
+    assert drive.trashed == ["id-2026-09-05-릴스캡션.txt"]

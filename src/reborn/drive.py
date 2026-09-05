@@ -53,6 +53,7 @@ TRANSPORT_ERRORS = (
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 FOLDER_MIME = "application/vnd.google-apps.folder"
+DOCS_MIME = "application/vnd.google-apps.document"
 # 원장은 발행 폴더에 따로 사는 파일이라 정리 대상이 아니다.
 PROTECTED_NAMES = {"_ledger.json"}
 IMAGE_MIMES = ("image/jpeg", "image/png", "image/heic", "image/heif", "image/webp")
@@ -263,8 +264,19 @@ class Drive:
         return folder["id"]
 
     def upload(
-        self, path: Path, parent_id: str, *, mime_type: str | None = None, name: str | None = None
+        self,
+        path: Path,
+        parent_id: str,
+        *,
+        mime_type: str | None = None,
+        name: str | None = None,
+        as_doc: bool = False,
     ) -> str:
+        """파일 하나를 올린다. as_doc=True 면 구글 문서로 변환해서 올린다.
+
+        변환하면 폰에서 탭 한 번으로 열려 그 자리에서 복사가 된다. txt 는
+        드라이브 앱에서 미리보기가 안 붙는 경우가 있어 은성님이 "안 보인다" 하셨다.
+        """
         name = name or path.name
         mime_type = mime_type or _guess_mime(path)
         media = MediaFileUpload(str(path), mimetype=mime_type, resumable=path.stat().st_size > 5_000_000)
@@ -276,10 +288,13 @@ class Drive:
                 .execute()
             )
         else:
+            body: dict = {"name": name, "parents": [parent_id]}
+            if as_doc:
+                body["mimeType"] = DOCS_MIME
             file = self._retry(
                 lambda: self.service.files()
                 .create(
-                    body={"name": name, "parents": [parent_id]},
+                    body=body,
                     media_body=media,
                     fields="id",
                     supportsAllDrives=True,
@@ -356,11 +371,28 @@ def upload_tree(drive: Drive, local_dir: Path, parent_id: str, *, mirror: bool =
             for rel, fid in upload_tree(drive, entry, child, mirror=mirror).items():
                 uploaded[f"{entry.name}/{rel}"] = fid
         else:
-            uploaded[entry.name] = drive.upload(entry, parent_id)
+            uploaded[entry.name] = drive.upload(
+                entry, parent_id, name=remote_name(entry), as_doc=_wants_doc(entry)
+            )
 
     if mirror:
-        _trash_extras(drive, parent_id, {e.name for e in local_dir.iterdir()})
+        _trash_extras(drive, parent_id, {remote_name(e) for e in local_dir.iterdir()})
     return uploaded
+
+
+def _wants_doc(path: Path) -> bool:
+    """구글 문서로 바꿔 올릴 파일인지. 지금은 캡션 같은 txt 가 대상이다."""
+    return path.suffix.lower() == ".txt"
+
+
+def remote_name(path: Path) -> str:
+    """드라이브에 올라갈 이름.
+
+    구글 문서로 변환하는 파일은 확장자를 뗀다. 문서가 된 뒤에는 .txt 가
+    아니기 때문이고, 이름이 어긋나면 다음 실행의 정리(mirror)가 어제 만든
+    문서를 '이번에 안 만든 파일'로 보고 휴지통에 넣어버린다.
+    """
+    return path.stem if _wants_doc(path) else path.name
 
 
 def _trash_extras(drive: Drive, parent_id: str, keep: set[str]) -> None:
