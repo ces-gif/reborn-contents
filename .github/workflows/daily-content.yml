@@ -119,6 +119,9 @@ jobs:
           MAX_CARDS_PER_DAY: ${{ vars.MAX_CARDS_PER_DAY }}
           INSTAGRAM_ENABLED: ${{ vars.INSTAGRAM_ENABLED }}
           MAX_STORIES_PER_DAY: ${{ vars.MAX_STORIES_PER_DAY }}
+          REEL_ENABLED: ${{ vars.REEL_ENABLED }}
+          REEL_SECONDS_PER_CARD: ${{ vars.REEL_SECONDS_PER_CARD }}
+          REEL_HEADLINE: ${{ vars.REEL_HEADLINE }}
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           VISION_MODEL: ${{ vars.VISION_MODEL }}
           WRITING_MODEL: ${{ vars.WRITING_MODEL }}

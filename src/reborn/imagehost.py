@@ -68,6 +68,21 @@ def _client():
     )
 
 
+# 확장자별 콘텐츠 타입. 잘못 올리면 인스타가 파일을 못 읽는다
+# (릴스 MP4 를 image/png 로 올리면 그대로 실패한다).
+CONTENT_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+}
+
+
+def content_type_for(path: Path) -> str:
+    return CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
+
+
 def upload_public(path: Path, key: str) -> str:
     """파일을 올리고 공개 URL 을 돌려준다."""
     if not is_configured():
@@ -82,7 +97,10 @@ def upload_public(path: Path, key: str) -> str:
         str(path),
         os.environ["R2_BUCKET"],
         key,
-        ExtraArgs={"ContentType": "image/png", "CacheControl": "public, max-age=86400"},
+        ExtraArgs={
+            "ContentType": content_type_for(path),
+            "CacheControl": "public, max-age=86400",
+        },
     )
     url = f"{base}/{key}"
     log.info("공개 URL 업로드: %s", url)

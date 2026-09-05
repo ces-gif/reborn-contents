@@ -20,10 +20,10 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import branding, instagram, llm, notify, research, social
+from . import branding, instagram, llm, notify, reels, research, social
 from .llm import LLMQuotaError
 from .blog import write_post
-from .cardnews import CardData, render_card
+from .cardnews import CardData, render_card, render_cover
 from .config import ASSETS, Settings, Source
 from .drive import Drive, DriveFile, upload_tree
 from .grouping import capture_time, filter_for_day, group_by_content
@@ -67,6 +67,9 @@ class RunResult:
     uploaded: dict[str, str] = field(default_factory=dict)
     notified: dict[str, bool] = field(default_factory=dict)
     stories: instagram.PublishReport | None = None
+    reel: instagram.ReelReport | None = None
+    cover: Path | None = None
+    reel_video: Path | None = None
     skipped_reason: str | None = None
     quota_note: str | None = None
     reading_mode: str = ""  # 사진을 어떻게 읽었는지 (통판독 / 예전 방식)
@@ -408,6 +411,33 @@ def run(
         render_card(card, product.best_photo, path, logo=logo)
         result.cards.append(path)
 
+    # 4-1) 릴스 맨 앞장에 붙일 표지 ------------------------------------------
+    if result.cards and settings.reel_enabled:
+        try:
+            result.cover = render_cover(
+                out_dir / "카드뉴스" / "00-표지.png",
+                date_label=target_day.strftime("%Y.%m.%d"),
+                store_name=settings.store_name,
+                headline=settings.reel_headline,
+                item_count=len(result.cards),
+                logo=logo,
+            )
+        except Exception as exc:
+            # 표지가 없다고 릴스를 통째로 포기하지 않는다 — 상품 카드만으로도 영상은 된다
+            log.warning("릴스 표지 생성 실패(표지 없이 진행): %s", exc)
+
+        # 영상은 인스타 설정과 상관없이 만들어 둔다. 자동 게시가 막힌 날에도
+        # 드라이브에 영상이 있으면 손으로 올릴 수 있다.
+        try:
+            frames = ([result.cover] if result.cover else []) + result.cards
+            result.reel_video = reels.build_slideshow(
+                frames,
+                out_dir / "릴스" / f"{day_slug}-릴스.mp4",
+                seconds_per_card=settings.reel_seconds_per_card,
+            )
+        except Exception as exc:
+            log.warning("릴스 영상 생성 실패: %s", exc)
+
     # 5) BEST5 블로그 ---------------------------------------------------------
     # 카드뉴스는 이미 다 만들었다. 여기서 넘어져도 그걸 날리지 않는다.
     # (실제로 블로그 한 칸의 형식이 어긋나 일산 카드뉴스 13장이 통째로 사라졌다)
@@ -460,7 +490,7 @@ def run(
         log.info("dry-run: 드라이브 업로드·인스타 게시·알림을 건너뜁니다")
         return result
 
-    # 8) 인스타그램 스토리 게시 (컴퓨터 없이 자동) ---------------------------
+    # 8) 인스타그램 게시 — 스토리 + 피드 (컴퓨터 없이 자동) -------------------
     if settings.instagram_enabled and result.cards:
         result.stories = instagram.publish_cards(
             result.cards,
@@ -468,6 +498,13 @@ def run(
             max_stories=settings.max_stories_per_day,
             delay_seconds=settings.story_delay_seconds,
         )
+        if settings.reel_enabled and result.reel_video:
+            result.reel = instagram.publish_reel_video(
+                result.reel_video,
+                caption=_read_caption(result),
+                key_prefix=f"reels/{day_slug}",
+                cover=result.cover,
+            )
 
     (out_dir / "_data" / "리포트.md").write_text(_report(result, settings), encoding="utf-8")
 
@@ -489,6 +526,7 @@ def run(
             "cards": len(result.cards),
             "needs_review": len(result.needs_review),
             "stories": len(result.stories.published) if result.stories else 0,
+            "reel": bool(result.reel and result.reel.ok),
             "drive_folder": result.drive_folder_url,
             "at": datetime.now(zone).isoformat(),
         }
@@ -689,6 +727,13 @@ def _report(result: RunResult, settings: Settings) -> str:
                 f"  · 사진: {', '.join(Path(x).name for x in p.photo_paths)}"
                 f" ({'+'.join(p.photo_kinds) or '?'})"
             )
+    if result.reel is not None:
+        if result.reel.skipped_reason:
+            lines.append(f"- 인스타 릴스: 건너뜀 — {result.reel.skipped_reason}")
+        elif result.reel.ok:
+            lines.append(f"- 인스타 릴스: 게시 완료 (표지 포함 {result.reel.card_count}장)")
+        else:
+            lines.append(f"- 인스타 릴스: 실패 — {result.reel.error}")
     if result.stories and result.stories.failed:
         lines += ["", "## 인스타 스토리 실패"]
         for r in result.stories.failed:
@@ -712,6 +757,13 @@ def print_summary(result: RunResult) -> None:
             print(f"   인스타 스토리: 건너뜀 — {result.stories.skipped_reason}")
         else:
             print(f"   인스타 스토리: {len(result.stories.published)}건 게시")
+    if result.reel is not None:
+        if result.reel.skipped_reason:
+            print(f"   인스타 릴스: 건너뜀 — {result.reel.skipped_reason}")
+        elif result.reel.ok:
+            print(f"   인스타 릴스: 게시 완료 (표지 포함 {result.reel.card_count}장)")
+        else:
+            print(f"   인스타 릴스: 실패 — {result.reel.error}")
     if result.needs_review:
         print(f"   ⚠️  확인 필요 {len(result.needs_review)}건")
     if result.failed_groups:
@@ -770,3 +822,14 @@ def _screen_card_photos(client, result: RunResult) -> None:
             result.needs_review.append(product)
     if blocked:
         log.warning("가격표만 크게 찍혀 카드를 만들지 않는 상품 %d개", len(blocked))
+
+
+def _read_caption(result: "RunResult") -> str:
+    """이미 만들어 둔 인스타 캡션 파일을 읽어 릴스 캡션으로 쓴다."""
+    for path in result.social_files:
+        if "인스타캡션" in path.name:
+            try:
+                return path.read_text(encoding="utf-8")
+            except OSError:
+                break
+    return ""

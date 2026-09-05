@@ -92,6 +92,9 @@ class Settings:
     instagram_enabled: bool
     max_stories_per_day: int
     story_delay_seconds: int
+    reel_enabled: bool
+    reel_seconds_per_card: float
+    reel_headline: str
 
     raw: dict = field(default_factory=dict, repr=False)
 
@@ -233,6 +236,11 @@ def _settings_from(data: dict) -> Settings:
         story_delay_seconds=_env_int(
             "STORY_DELAY_SECONDS", int(instagram.get("delay_between_seconds", 20))
         ),
+        reel_enabled=_env_bool("REEL_ENABLED", bool(instagram.get("reel_enabled", True))),
+        reel_seconds_per_card=float(
+            _env("REEL_SECONDS_PER_CARD", str(instagram.get("reel_seconds_per_card", 0.8)))
+        ),
+        reel_headline=_env("REEL_HEADLINE", instagram.get("reel_headline", "오늘의 추천템")),
         raw=data,
     )
 

@@ -131,3 +131,31 @@ def test_아주_긴_상태표기는_사진_밖으로_안_넘어간다(tmp_path, 
     note = "모서리 찌그러짐과 표면 까짐 그리고 사용감이 상당히 많이 있습니다 확인 바랍니다"
     out = cardnews.render_card(_card(condition_note=note), photo, tmp_path / "c.png")
     assert out.exists()
+
+
+def test_cover_card_is_story_sized_and_holds_the_headline(tmp_path, logo):
+    """릴스 표지는 상품 카드와 같은 1080x1920 이어야 이어 붙일 때 안 깨진다."""
+    from reborn.cardnews import render_cover
+
+    out = render_cover(
+        tmp_path / "00-표지.png",
+        date_label="2026.09.05",
+        store_name="리본마켓 평택점",
+        headline="오늘의 추천템",
+        item_count=9,
+    )
+    with Image.open(out) as img:
+        assert img.size == (1080, 1920)
+
+
+def test_cover_shrinks_a_long_headline_instead_of_overflowing(tmp_path, logo):
+    from reborn.cardnews import render_cover
+
+    out = render_cover(
+        tmp_path / "long.png",
+        date_label="2026.09.05",
+        store_name="여우마켓 일산점 리퍼브 전문 매장",
+        headline="오늘의 아주 특별한 추천템 모음",
+    )
+    with Image.open(out) as img:
+        assert img.size == (1080, 1920)

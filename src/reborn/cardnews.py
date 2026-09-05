@@ -274,3 +274,59 @@ def _draw_prices(draw: ImageDraw.ImageDraw, data: CardData) -> None:
         if x + text_width(price_text, price_font) <= right_limit:
             break
     draw.text((x, sale_price_y), price_text, font=price_font, fill=B.WHITE)
+
+
+# ================================================================ 릴스 표지
+# 릴스는 세로 9:16 — 우리 카드와 같은 규격이라 상품 카드는 그대로 쓴다.
+# 맨 앞에 붙일 표지 한 장만 따로 그린다.
+def render_cover(
+    out_path: Path,
+    *,
+    date_label: str,
+    store_name: str,
+    headline: str = "오늘의 추천템",
+    item_count: int | None = None,
+    strict_logo: bool = True,
+    logo: Path | str | Image.Image | None = None,
+) -> Path:
+    """릴스 맨 앞장(표지). 날짜 · 매장 · 오늘의 추천템. 상품 카드와 같은 1080x1920."""
+    canvas = Image.new("RGB", (W, H), B.BG)
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle([0, 0, W, Y_ACCENT_BAR], fill=B.ORANGE)
+
+    mark = _logo_image(logo, strict_logo)
+    canvas.paste(mark, ((W - mark.width) // 2, 540), mark)
+
+    y = 540 + mark.height + 104
+    if date_label:
+        f = B.font("bold", 58)
+        draw.text(((W - text_width(date_label, f)) / 2, y), date_label, font=f, fill=B.MUTED)
+        y += 108
+
+    f = B.font("bold", 64)
+    draw.text(((W - text_width(store_name, f)) / 2, y), store_name, font=f, fill=B.INK)
+    y += 132
+
+    # 제목은 폭에 맞춰 자동 축소 — 문구가 길어져도 넘치지 않는다
+    for size in (150, 136, 122, 108, 96):
+        title_font = B.font("extrabold", size)
+        if text_width(headline, title_font) <= CONTENT_W:
+            break
+    draw.text(((W - text_width(headline, title_font)) / 2, y), headline,
+              font=title_font, fill=B.INK)
+    y += title_font.size + 74
+
+    draw.rounded_rectangle([(W - 200) // 2, y, (W + 200) // 2, y + 12], radius=6, fill=B.ORANGE)
+    y += 108
+
+    if item_count:
+        _pill(draw, W // 2, y + 40, f"총 {item_count}개", bg=B.SLATE, fg=B.WHITE, size=48)
+
+    draw.rectangle([0, Y_FOOTER, W, H], fill=B.FOOTER_BG)
+    f = B.font("semibold", 36)
+    note = "매장에서 직접 보고 구매하세요"
+    draw.text(((W - text_width(note, f)) / 2, Y_FOOTER + 30), note, font=f, fill=(226, 229, 238))
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(out_path, "PNG")
+    return out_path
