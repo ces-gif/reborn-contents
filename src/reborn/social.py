@@ -128,6 +128,31 @@ def _biggest_savings(products: list[Product], count: int) -> list[Product]:
     return priced[:count] or products[:count]
 
 
+NAME_MAX = 26
+# 쇼핑몰에서 그대로 딸려온 옵션 구분자. 여기서 자르면 상품 이름만 남는다.
+NAME_CUTS = (" / ", "_", " | ")
+
+
+def _short_name(name: str) -> str:
+    """캡션에 들어갈 만큼 상품 이름을 줄인다.
+
+    가격표를 그대로 읽다 보면 쇼핑몰 등록명이 통째로 들어오는 날이 있다.
+    ("FlexiSpot 좌식의자 접이식 패브릭 등받이좌식의자 … FC0 / 화이트")
+    그대로 캡션에 넣으면 한 줄이 화면을 넘어가 세 상품이 다 안 읽힌다.
+    **앞쪽을 남기고 자르기만 한다** — 없는 말을 지어 붙이지 않는다.
+    """
+    for cut in NAME_CUTS:
+        name = name.split(cut, 1)[0].strip()
+    if len(name) <= NAME_MAX:
+        return name
+    kept: list[str] = []
+    for word in name.split():
+        if kept and len(" ".join(kept + [word])) > NAME_MAX:
+            break
+        kept.append(word)
+    return " ".join(kept) if kept else name[:NAME_MAX]
+
+
 def reel_caption(
     products: list[Product],
     *,
@@ -139,10 +164,11 @@ def reel_caption(
     lines = [_hook(products), f"{store_name}에 오면 반값에 득템 가능해요.", ""]
 
     for p in _biggest_savings(products, REEL_HIGHLIGHTS):
+        name = _short_name(p.product_name)
         if p.original_price:
-            lines.append(f"{p.product_name} {p.sale_price:,}원 (원가 {p.original_price:,}원)")
+            lines.append(f"{name} {p.sale_price:,}원 (원가 {p.original_price:,}원)")
         else:
-            lines.append(f"{p.product_name} {p.sale_price:,}원")
+            lines.append(f"{name} {p.sale_price:,}원")
     lines += [
         "",
         "✔ 포장만 뜯긴 리퍼 새상품만 (중고 절대 X)",

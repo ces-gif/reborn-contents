@@ -262,3 +262,44 @@ def test_reel_caption_never_says_used():
     caption = social.reel_caption([_product("냄비", 22400, 44800)], store_name="리본마켓 평택점")
     assert "중고 절대 X" in caption  # 중고가 아니라는 말은 해도 된다
     assert "중고 상품" not in caption
+
+
+# ------------------------------------------- 쇼핑몰 등록명이 통째로 들어온 날
+
+
+def test_reel_caption_trims_a_shopping_mall_listing_name():
+    """실제 일산 09-05: 좌식의자 이름 하나가 60자를 넘어 한 줄을 다 먹었다."""
+    from reborn import social
+
+    long_name = (
+        "FlexiSpot 좌식의자 접이식 패브릭 등받이좌식의자 좌식 소파 "
+        "휴대용 캠핑좌식의자 FC0 / 화이트"
+    )
+    caption = social.reel_caption(
+        [_product(long_name, 52000, 104000)], store_name="여우마켓 일산점"
+    )
+    line = next(l for l in caption.splitlines() if "52,000원" in l)
+    assert len(line) <= 60
+    assert line.startswith("FlexiSpot 좌식의자")
+
+
+def test_reel_caption_cuts_at_the_option_separator():
+    """'_' 뒤는 옵션(색상·구성)이라 상품 이름이 아니다."""
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("풀인퍼니 베나 식탁세트_베나 의자_스노우화이트", 33800, 67600)],
+        store_name="여우마켓 일산점",
+    )
+    assert "풀인퍼니 베나 식탁세트 33,800원" in caption
+    assert "스노우화이트" not in caption
+
+
+def test_reel_caption_leaves_a_normal_name_alone():
+    """짧은 이름까지 건드리면 상품을 못 알아본다."""
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("아이넥스 싱크선반 600", 63300, 126650)], store_name="리본마켓 평택점"
+    )
+    assert "아이넥스 싱크선반 600 63,300원" in caption
