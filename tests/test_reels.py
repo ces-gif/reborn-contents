@@ -177,3 +177,18 @@ def test_reel_folder_defaults_to_refurb_when_nothing_published():
     from reborn.pipeline import RunResult, _reel_folder
 
     assert _reel_folder(RunResult(day="2026-09-05")) == "리퍼"
+
+
+def test_reel_build_failure_is_reported_not_silent(tmp_path, monkeypatch):
+    """영상이 안 만들어졌으면 리포트에 남아야 한다.
+
+    첫 실전에서 ffmpeg 가 러너에 없어 영상이 통째로 빠졌는데, 경고 로그만
+    남고 리포트에는 한 줄도 없었다. 왜 영상이 없는지 알 수가 없었다.
+    """
+    from reborn.pipeline import RunResult
+
+    result = RunResult(day="2026-09-05")
+    result.reel_error = "ffmpeg 를 찾을 수 없습니다"
+    result.step_failures.append(f"릴스 영상: {result.reel_error}")
+
+    assert result.step_failures  # 깃허브 이슈로 알림이 가는 통로

@@ -1,5 +1,6 @@
 Pillow>=11.0.0
 pillow-heif>=0.18.0   # 아이폰 HEIC 사진 열기
+imageio-ffmpeg>=0.5.1 # 릴스 영상용 ffmpeg (정적 바이너리를 같이 들고 온다)
 google-api-python-client>=2.140.0
 google-auth>=2.34.0
 google-auth-httplib2>=0.2.0

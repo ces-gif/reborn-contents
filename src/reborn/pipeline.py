@@ -70,6 +70,7 @@ class RunResult:
     reel: instagram.ReelReport | None = None
     cover: Path | None = None
     reel_video: Path | None = None
+    reel_error: str = ""
     skipped_reason: str | None = None
     quota_note: str | None = None
     reading_mode: str = ""  # 사진을 어떻게 읽었는지 (통판독 / 예전 방식)
@@ -437,6 +438,9 @@ def run(
                 seconds_per_card=settings.reel_seconds_per_card,
             )
         except Exception as exc:
+            # 조용히 넘기지 않는다. 리포트에 남겨야 영상이 왜 없는지 알 수 있다.
+            result.reel_error = str(exc)
+            result.step_failures.append(f"릴스 영상: {exc}")
             log.warning("릴스 영상 생성 실패: %s", exc)
 
     # 5) BEST5 블로그 ---------------------------------------------------------
@@ -728,13 +732,17 @@ def _report(result: RunResult, settings: Settings) -> str:
                 f"  · 사진: {', '.join(Path(x).name for x in p.photo_paths)}"
                 f" ({'+'.join(p.photo_kinds) or '?'})"
             )
+    if result.reel_error:
+        lines.append(f"- 릴스 영상: **만들지 못했습니다** — {result.reel_error}")
+    elif result.reel_video:
+        lines.append(f"- 릴스 영상: {result.reel_video.name} (표지 포함 {len(result.cards) + (1 if result.cover else 0)}장)")
     if result.reel is not None:
         if result.reel.skipped_reason:
-            lines.append(f"- 인스타 릴스: 건너뜀 — {result.reel.skipped_reason}")
+            lines.append(f"- 인스타 릴스 게시: 건너뜀 — {result.reel.skipped_reason}")
         elif result.reel.ok:
-            lines.append(f"- 인스타 릴스: 게시 완료 (표지 포함 {result.reel.card_count}장)")
+            lines.append("- 인스타 릴스 게시: 완료")
         else:
-            lines.append(f"- 인스타 릴스: 실패 — {result.reel.error}")
+            lines.append(f"- 인스타 릴스 게시: 실패 — {result.reel.error}")
     if result.stories and result.stories.failed:
         lines += ["", "## 인스타 스토리 실패"]
         for r in result.stories.failed:
@@ -758,9 +766,13 @@ def print_summary(result: RunResult) -> None:
             print(f"   인스타 스토리: 건너뜀 — {result.stories.skipped_reason}")
         else:
             print(f"   인스타 스토리: {len(result.stories.published)}건 게시")
+    if result.reel_error:
+        print(f"   ⚠️  릴스 영상을 만들지 못했습니다 — {result.reel_error}")
+    elif result.reel_video:
+        print(f"   릴스 영상: {result.reel_video.name}")
     if result.reel is not None:
         if result.reel.skipped_reason:
-            print(f"   인스타 릴스: 건너뜀 — {result.reel.skipped_reason}")
+            print(f"   인스타 릴스 게시: 건너뜀 — {result.reel.skipped_reason}")
         elif result.reel.ok:
             print(f"   인스타 릴스: 게시 완료 (표지 포함 {result.reel.card_count}장)")
         else:
