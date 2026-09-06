@@ -118,7 +118,7 @@ def test_one_failure_does_not_stop_the_rest(creds, monkeypatch, tmp_path):
 
     def flaky(url, *, ig_user_id=""):
         calls.append(url)
-        if "1.jpg" in url:   # 업로드는 JPEG 로 나간다
+        if url.endswith("/02.jpg"):   # 두 번째 카드만 실패시킨다
             raise RuntimeError("일시 오류")
         return "media-x"
 
@@ -181,7 +181,7 @@ def test_cards_are_converted_to_jpeg_before_upload(tmp_path, creds, monkeypatch)
 
     assert report.published
     key, fmt, mode = sent[0]
-    assert key.endswith("01-선반.jpg")     # PNG 가 아니라 JPG 로 나간다
+    assert key == "k/01.jpg"              # 한글 없는 ASCII 키 + JPG
     assert fmt == "JPEG" and mode == "RGB"
 
 
@@ -202,3 +202,34 @@ def test_transparent_pixels_get_a_white_background(tmp_path):
     out = instagram.as_jpeg(card, tmp_path)
     with Image.open(out) as im:
         assert im.getpixel((4, 4)) == (255, 255, 255)
+
+
+def test_upload_keys_stay_ascii(tmp_path, creds, monkeypatch):
+    """URL 에 한글이 들어가면 인스타가 그 주소를 못 가져와 400 으로 거절한다."""
+    from reborn import imagehost
+
+    cards = [_png(tmp_path / f"0{i}-아이넥스-싱크선반.png") for i in range(1, 4)]
+    keys = []
+    monkeypatch.setattr(imagehost, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        imagehost, "upload_public", lambda p, key: keys.append(key) or f"https://cdn/{key}"
+    )
+    monkeypatch.setattr(instagram, "publish_story", lambda url, **kw: "m")
+
+    instagram.publish_cards(cards, key_prefix="cardnews/2026-09-04", delay_seconds=0, ig_user_id=IG)
+
+    assert keys == [f"cardnews/2026-09-04/0{i}.jpg" for i in (1, 2, 3)]
+    assert all(k.isascii() for k in keys)
+
+
+def test_error_detail_keeps_code_and_subcode():
+    """메시지만 남기면 형식 문제인지 URL 문제인지 구분이 안 된다."""
+    payload = {
+        "error": {
+            "message": "Only photo or video can be accepted as media type.",
+            "code": 9004,
+            "error_subcode": 2207052,
+        }
+    }
+    detail = instagram._error_detail(payload, None)
+    assert "9004" in detail and "2207052" in detail and "Only photo" in detail

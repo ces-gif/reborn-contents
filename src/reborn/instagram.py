@@ -99,9 +99,25 @@ def _post(url: str, data: dict) -> dict:
     response = requests.post(url, data=data, timeout=TIMEOUT)
     payload = response.json() if response.content else {}
     if response.status_code >= 400:
-        message = (payload.get("error") or {}).get("message", response.text[:300])
-        raise RuntimeError(f"인스타그램 API 오류 {response.status_code}: {message}")
+        raise RuntimeError(f"인스타그램 API 오류 {response.status_code}: {_error_detail(payload, response)}")
     return payload
+
+
+def _error_detail(payload: dict, response) -> str:
+    """메시지만 남기면 원인을 못 짚는다. code·subcode·사용자 메시지까지 붙인다.
+
+    09-04 게시 실패 때 'Only photo or video can be accepted as media type' 한 줄만
+    남아서 형식 문제인지 URL 을 못 가져온 건지 구분할 수 없었다.
+    """
+    error = payload.get("error") or {}
+    if not error:
+        return response.text[:300]
+    bits = [str(error.get("message", ""))]
+    for label, key in (("code", "code"), ("subcode", "error_subcode"), ("안내", "error_user_msg")):
+        value = error.get(key)
+        if value:
+            bits.append(f"{label}={value}")
+    return " | ".join(b for b in bits if b)
 
 
 def _wait_until_ready(container_id: str, token: str) -> None:
@@ -212,7 +228,9 @@ def publish_cards(
         for i, card in enumerate(targets):
             try:
                 sendable = as_jpeg(card, work)
-                url = imagehost.upload_public(sendable, f"{key_prefix}/{sendable.name}")
+                # 키를 번호로만 짓는다. 상품 이름(한글)이 URL 에 들어가면 인스타가
+                # 그 주소를 못 가져와 "Only photo or video…" 로 거절할 수 있다.
+                url = imagehost.upload_public(sendable, f"{key_prefix}/{i + 1:02d}.jpg")
                 media_id = publish_story(url, ig_user_id=ig_user_id)
                 report.results.append(StoryResult(card=card, ok=True, media_id=media_id, url=url))
             except Exception as exc:
@@ -333,12 +351,12 @@ def publish_reel_video(
         return report
 
     try:
-        video_url = imagehost.upload_public(video, f"{key_prefix}/{video.name}")
+        video_url = imagehost.upload_public(video, f"{key_prefix}/reel.mp4")
         cover_url = ""
         if cover and cover.exists():
             with tempfile.TemporaryDirectory(prefix="ig-cover-") as tmp:
                 shot = as_jpeg(cover, Path(tmp))       # 표지도 JPEG 여야 한다
-                cover_url = imagehost.upload_public(shot, f"{key_prefix}/{shot.name}")
+                cover_url = imagehost.upload_public(shot, f"{key_prefix}/cover.jpg")
         report.media_id = publish_reel(
             video_url, caption, cover_url=cover_url, ig_user_id=ig_user_id
         )
