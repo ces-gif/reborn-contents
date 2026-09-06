@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -144,6 +145,32 @@ def publish_story(image_url: str, *, ig_user_id: str = "") -> str:
     return media_id
 
 
+# 인스타 이미지 컨테이너는 **JPEG 만 받는다.** PNG 를 그대로 올리면 인스타가
+# 파일을 받아본 뒤 "Only photo or video can be accepted as media type" 로
+# 거절한다(400). 실제로 09-04 평택 첫 게시에서 스토리 10장이 전부 이걸로 실패했다.
+# 드라이브에는 PNG 를 그대로 두고, 인스타로 보낼 때만 변환한다.
+JPEG_QUALITY = 92
+
+
+def as_jpeg(path: Path, work_dir: Path) -> Path:
+    """PNG 를 JPEG 로 바꿔 임시 폴더에 둔다. 이미 JPEG 면 그대로 쓴다."""
+    if path.suffix.lower() in (".jpg", ".jpeg"):
+        return path
+    from PIL import Image
+
+    out = work_dir / f"{path.stem}.jpg"
+    with Image.open(path) as im:
+        # 투명 픽셀이 있으면 흰 배경에 얹는다. JPEG 는 투명을 모른다.
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA")
+            flat = Image.new("RGB", im.size, (255, 255, 255))
+            flat.paste(im, mask=im.split()[-1])
+        else:
+            flat = im.convert("RGB")
+        flat.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True)
+    return out
+
+
 def publish_cards(
     cards: list[Path],
     *,
@@ -180,16 +207,19 @@ def publish_cards(
             len(targets),
         )
 
-    for i, card in enumerate(targets):
-        try:
-            url = imagehost.upload_public(card, f"{key_prefix}/{card.name}")
-            media_id = publish_story(url, ig_user_id=ig_user_id)
-            report.results.append(StoryResult(card=card, ok=True, media_id=media_id, url=url))
-        except Exception as exc:
-            log.warning("스토리 게시 실패 (%s): %s", card.name, exc)
-            report.results.append(StoryResult(card=card, ok=False, error=str(exc)))
-        if i < len(targets) - 1 and delay_seconds:
-            time.sleep(delay_seconds)
+    with tempfile.TemporaryDirectory(prefix="ig-") as tmp:
+        work = Path(tmp)
+        for i, card in enumerate(targets):
+            try:
+                sendable = as_jpeg(card, work)
+                url = imagehost.upload_public(sendable, f"{key_prefix}/{sendable.name}")
+                media_id = publish_story(url, ig_user_id=ig_user_id)
+                report.results.append(StoryResult(card=card, ok=True, media_id=media_id, url=url))
+            except Exception as exc:
+                log.warning("스토리 게시 실패 (%s): %s", card.name, exc)
+                report.results.append(StoryResult(card=card, ok=False, error=str(exc)))
+            if i < len(targets) - 1 and delay_seconds:
+                time.sleep(delay_seconds)
 
     return report
 
@@ -304,11 +334,11 @@ def publish_reel_video(
 
     try:
         video_url = imagehost.upload_public(video, f"{key_prefix}/{video.name}")
-        cover_url = (
-            imagehost.upload_public(cover, f"{key_prefix}/{cover.name}")
-            if cover and cover.exists()
-            else ""
-        )
+        cover_url = ""
+        if cover and cover.exists():
+            with tempfile.TemporaryDirectory(prefix="ig-cover-") as tmp:
+                shot = as_jpeg(cover, Path(tmp))       # 표지도 JPEG 여야 한다
+                cover_url = imagehost.upload_public(shot, f"{key_prefix}/{shot.name}")
         report.media_id = publish_reel(
             video_url, caption, cover_url=cover_url, ig_user_id=ig_user_id
         )

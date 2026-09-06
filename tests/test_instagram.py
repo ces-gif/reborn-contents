@@ -24,6 +24,14 @@ class FakeResponse:
 IG = "1784"
 
 
+def _png(path):
+    """진짜 PNG 를 만든다. 올리기 전에 JPEG 로 변환하므로 가짜 바이트는 못 쓴다."""
+    from PIL import Image
+
+    Image.new("RGB", (12, 20), (200, 60, 40)).save(path)
+    return path
+
+
 @pytest.fixture
 def creds(monkeypatch):
     monkeypatch.setenv("IG_ACCESS_TOKEN", "tok")
@@ -101,7 +109,7 @@ def test_publish_cards_skips_without_image_host(creds, monkeypatch, tmp_path):
 def test_one_failure_does_not_stop_the_rest(creds, monkeypatch, tmp_path):
     cards = [tmp_path / f"{i}.png" for i in range(3)]
     for c in cards:
-        c.write_bytes(b"x")
+        _png(c)
 
     monkeypatch.setattr(imagehost, "is_configured", lambda: True)
     monkeypatch.setattr(imagehost, "upload_public", lambda p, key: f"https://cdn/{key}")
@@ -110,7 +118,7 @@ def test_one_failure_does_not_stop_the_rest(creds, monkeypatch, tmp_path):
 
     def flaky(url, *, ig_user_id=""):
         calls.append(url)
-        if "1.png" in url:
+        if "1.jpg" in url:   # 업로드는 JPEG 로 나간다
             raise RuntimeError("일시 오류")
         return "media-x"
 
@@ -126,7 +134,7 @@ def test_one_failure_does_not_stop_the_rest(creds, monkeypatch, tmp_path):
 def test_daily_cap_limits_how_many_stories_go_up(creds, monkeypatch, tmp_path):
     cards = [tmp_path / f"{i}.png" for i in range(8)]
     for c in cards:
-        c.write_bytes(b"x")
+        _png(c)
     monkeypatch.setattr(imagehost, "is_configured", lambda: True)
     monkeypatch.setattr(imagehost, "upload_public", lambda p, key: f"https://cdn/{key}")
     monkeypatch.setattr(instagram, "publish_story", lambda url, **kw: "media-x")
@@ -143,3 +151,54 @@ def test_imagehost_reports_not_configured(monkeypatch):
     assert not imagehost.is_configured()
     with pytest.raises(imagehost.NotConfigured):
         imagehost.upload_public(Path("x.png"), "k")
+
+
+# ------------------------------------- 인스타는 JPEG 만 받는다 (09-04 실전 실패)
+
+
+def test_cards_are_converted_to_jpeg_before_upload(tmp_path, creds, monkeypatch):
+    """PNG 그대로 올리면 인스타가 400 'Only photo or video…' 로 거절한다."""
+    from PIL import Image
+
+    from reborn import imagehost
+
+    card = tmp_path / "01-선반.png"
+    Image.new("RGBA", (108, 192), (255, 0, 0, 255)).save(card)
+
+    sent = []
+
+    def capture(path, key):
+        # 임시 폴더는 publish_cards 가 끝나면 지워지므로 지금 열어본다
+        with Image.open(path) as im:
+            sent.append((key, im.format, im.mode))
+        return f"https://cdn/{key}"
+
+    monkeypatch.setattr(imagehost, "is_configured", lambda: True)
+    monkeypatch.setattr(imagehost, "upload_public", capture)
+    monkeypatch.setattr(instagram, "publish_story", lambda url, **kw: "m-1")
+
+    report = instagram.publish_cards([card], key_prefix="k", delay_seconds=0, ig_user_id=IG)
+
+    assert report.published
+    key, fmt, mode = sent[0]
+    assert key.endswith("01-선반.jpg")     # PNG 가 아니라 JPG 로 나간다
+    assert fmt == "JPEG" and mode == "RGB"
+
+
+def test_a_jpeg_card_is_left_alone(tmp_path):
+    from PIL import Image
+
+    card = tmp_path / "a.jpg"
+    Image.new("RGB", (10, 10)).save(card)
+    assert instagram.as_jpeg(card, tmp_path) == card
+
+
+def test_transparent_pixels_get_a_white_background(tmp_path):
+    """투명을 그냥 버리면 검게 나온다. JPEG 는 투명을 모른다."""
+    from PIL import Image
+
+    card = tmp_path / "t.png"
+    Image.new("RGBA", (8, 8), (0, 0, 0, 0)).save(card)
+    out = instagram.as_jpeg(card, tmp_path)
+    with Image.open(out) as im:
+        assert im.getpixel((4, 4)) == (255, 255, 255)
