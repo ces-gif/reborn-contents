@@ -75,9 +75,12 @@ class FakeResponse:
         return self._payload
 
 
+# 계정 ID 는 매장 설정에서 오고(ig_user_id 인자), 토큰만 환경변수다.
+IG = "1784"
+
+
 @pytest.fixture
 def creds(monkeypatch):
-    monkeypatch.setenv("IG_USER_ID", "1784")
     monkeypatch.setenv("IG_ACCESS_TOKEN", "tok")
 
 
@@ -93,7 +96,7 @@ def test_publish_reel_sends_reels_type_and_video_url(creds, monkeypatch):
         instagram.requests, "get", lambda *a, **k: FakeResponse({"status_code": "FINISHED"})
     )
 
-    assert instagram.publish_reel("https://cdn/x.mp4", "캡션", cover_url="https://cdn/c.png") == "m-9"
+    assert instagram.publish_reel("https://cdn/x.mp4", "캡션", cover_url="https://cdn/c.png", ig_user_id=IG) == "m-9"
 
     fields = posts[0][1]
     assert fields["media_type"] == "REELS"
@@ -115,7 +118,7 @@ def test_reel_waits_for_video_encoding(creds, monkeypatch):
     monkeypatch.setattr(instagram.requests, "get", fake_get)
     monkeypatch.setattr(instagram.time, "sleep", lambda s: None)
 
-    instagram.publish_reel("https://cdn/x.mp4", "캡션")
+    instagram.publish_reel("https://cdn/x.mp4", "캡션", ig_user_id=IG)
     assert seen["n"] == 3  # 끝날 때까지 기다렸다
 
 
@@ -127,15 +130,16 @@ def test_reel_gives_up_with_reason_when_encoding_errors(creds, monkeypatch):
         lambda *a, **k: FakeResponse({"status_code": "ERROR", "status": "형식 오류"}),
     )
     with pytest.raises(RuntimeError, match="형식 오류"):
-        instagram.publish_reel("https://cdn/x.mp4", "캡션")
+        instagram.publish_reel("https://cdn/x.mp4", "캡션", ig_user_id=IG)
 
 
 def test_skips_without_credentials(tmp_path, monkeypatch):
-    monkeypatch.delenv("IG_USER_ID", raising=False)
-    monkeypatch.delenv("IG_ACCESS_TOKEN", raising=False)
+    """계정이 없는 매장(일산)은 게시하지 않는다. 환경변수로 대신하지도 않는다."""
+    monkeypatch.setenv("IG_USER_ID", "1784")
+    monkeypatch.setenv("IG_ACCESS_TOKEN", "tok")
     video = reels.build_slideshow(_cards(tmp_path, 4), tmp_path / "r.mp4")
     report = instagram.publish_reel_video(video, caption="c", key_prefix="reels/x")
-    assert not report.ok and "IG_USER_ID" in report.skipped_reason
+    assert not report.ok and "계정이 설정되지 않아" in report.skipped_reason
     # 게시는 못 했어도 영상은 남아 있어야 한다 — 손으로 올릴 수 있게
     assert report.video and report.video.exists()
 

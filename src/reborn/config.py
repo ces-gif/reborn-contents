@@ -79,6 +79,7 @@ class Settings:
     store_id: str
     store_name: str
     store_handle: str
+    ig_user_id: str
     footer_note: str
     visit_line: str
 
@@ -224,6 +225,7 @@ def _settings_from(data: dict) -> Settings:
         store_id=str(store.get("id", "") or store.get("name", "매장")),
         store_name=_env("STORE_NAME", store.get("name", "리본마켓 평택점")),
         store_handle=_env("STORE_HANDLE", store.get("handle", "@reborn.mk")),
+        ig_user_id=str(store.get("ig_user_id", "") or "").strip(),
         footer_note=_env("FOOTER_NOTE", store.get("footer_note", "")),
         visit_line=_env("VISIT_LINE", store.get("visit_line", "")),
         card_width=_env_int("CARD_WIDTH", int(card.get("width", 1080))),

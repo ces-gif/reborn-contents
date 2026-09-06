@@ -68,18 +68,30 @@ class PublishReport:
         return [r for r in self.results if not r.ok]
 
 
-def is_configured() -> bool:
-    return bool(os.environ.get("IG_USER_ID") and os.environ.get("IG_ACCESS_TOKEN"))
+def account_id(user_id: str = "") -> str:
+    """게시할 인스타 계정. **매장 설정에 적힌 것만 쓴다.**
+
+    매장마다 계정이 다르다. 리본마켓 평택점은 @reborn.mk, 여우마켓 일산점은
+    아직 계정이 없다. 여기서 IG_USER_ID 환경변수로 넘어가면 계정이 없는 매장의
+    카드가 평택 계정으로 올라간다 — 일산 상품이 리본마켓 피드에 뜨는 것이다.
+    그래서 **환경변수로 대신하지 않는다.** 비어 있으면 그 매장은 게시하지 않는다.
+    계정을 지정하려면 settings.yaml 의 그 매장 store 아래에 ig_user_id 를 적는다.
+    """
+    return (user_id or "").strip()
 
 
-def _credentials() -> tuple[str, str]:
-    user_id = os.environ.get("IG_USER_ID")
+def is_configured(user_id: str = "") -> bool:
+    return bool(account_id(user_id) and os.environ.get("IG_ACCESS_TOKEN"))
+
+
+def _credentials(user_id: str = "") -> tuple[str, str]:
+    resolved = account_id(user_id)
     token = os.environ.get("IG_ACCESS_TOKEN")
-    if not (user_id and token):
+    if not (resolved and token):
         raise InstagramNotConfigured(
             "IG_USER_ID / IG_ACCESS_TOKEN 이 없습니다. (docs/SETUP.md 5단계 참고)"
         )
-    return user_id, token
+    return resolved, token
 
 
 def _post(url: str, data: dict) -> dict:
@@ -109,9 +121,9 @@ def _wait_until_ready(container_id: str, token: str) -> None:
     raise RuntimeError("컨테이너가 준비되지 않았습니다 (시간 초과)")
 
 
-def publish_story(image_url: str) -> str:
+def publish_story(image_url: str, *, ig_user_id: str = "") -> str:
     """공개 이미지 URL 을 스토리로 게시하고 media id 를 돌려준다."""
-    user_id, token = _credentials()
+    user_id, token = _credentials(ig_user_id)
 
     container = _post(
         f"{GRAPH}/{user_id}/media",
@@ -138,6 +150,7 @@ def publish_cards(
     key_prefix: str,
     max_stories: int = 10,
     delay_seconds: int = 20,
+    ig_user_id: str = "",
 ) -> PublishReport:
     """카드뉴스 PNG 들을 공개 URL 로 올린 뒤 스토리로 순서대로 게시한다.
 
@@ -147,8 +160,8 @@ def publish_cards(
 
     report = PublishReport()
 
-    if not is_configured():
-        report.skipped_reason = "인스타 계정 정보(IG_USER_ID/IG_ACCESS_TOKEN)가 없어 건너뜁니다"
+    if not is_configured(ig_user_id):
+        report.skipped_reason = "이 매장의 인스타 계정이 설정되지 않아 건너뜁니다"
         log.info(report.skipped_reason)
         return report
     if not imagehost.is_configured():
@@ -170,7 +183,7 @@ def publish_cards(
     for i, card in enumerate(targets):
         try:
             url = imagehost.upload_public(card, f"{key_prefix}/{card.name}")
-            media_id = publish_story(url)
+            media_id = publish_story(url, ig_user_id=ig_user_id)
             report.results.append(StoryResult(card=card, ok=True, media_id=media_id, url=url))
         except Exception as exc:
             log.warning("스토리 게시 실패 (%s): %s", card.name, exc)
@@ -225,9 +238,11 @@ def _wait_for_video(container_id: str, token: str) -> None:
     raise RuntimeError("릴스가 준비되지 않았습니다 (시간 초과)")
 
 
-def publish_reel(video_url: str, caption: str, *, cover_url: str = "") -> str:
+def publish_reel(
+    video_url: str, caption: str, *, cover_url: str = "", ig_user_id: str = ""
+) -> str:
     """공개 MP4 URL 을 릴스로 게시하고 media id 를 돌려준다."""
-    user_id, token = _credentials()
+    user_id, token = _credentials(ig_user_id)
     fields = {
         "media_type": "REELS",
         "video_url": video_url,
@@ -261,6 +276,7 @@ def publish_reel_video(
     caption: str,
     key_prefix: str,
     cover: Path | None = None,
+    ig_user_id: str = "",
 ) -> ReelReport:
     """이미 만들어 둔 릴스 영상을 올린다.
 
@@ -274,8 +290,8 @@ def publish_reel_video(
     if not video or not video.exists():
         report.skipped_reason = "올릴 영상이 없습니다"
         return report
-    if not is_configured():
-        report.skipped_reason = "인스타 계정 정보(IG_USER_ID/IG_ACCESS_TOKEN)가 없어 건너뜁니다"
+    if not is_configured(ig_user_id):
+        report.skipped_reason = "이 매장의 인스타 계정이 설정되지 않아 건너뜁니다"
         log.info(report.skipped_reason)
         return report
     if not imagehost.is_configured():
@@ -293,7 +309,9 @@ def publish_reel_video(
             if cover and cover.exists()
             else ""
         )
-        report.media_id = publish_reel(video_url, caption, cover_url=cover_url)
+        report.media_id = publish_reel(
+            video_url, caption, cover_url=cover_url, ig_user_id=ig_user_id
+        )
         report.ok = True
     except Exception as exc:
         log.warning("릴스 게시 실패: %s", exc)

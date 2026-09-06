@@ -523,6 +523,7 @@ def run(
             key_prefix=f"cardnews/{day_slug}",
             max_stories=settings.max_stories_per_day,
             delay_seconds=settings.story_delay_seconds,
+            ig_user_id=settings.ig_user_id,
         )
         if settings.reel_enabled and result.reel_video:
             result.reel = instagram.publish_reel_video(
@@ -530,6 +531,7 @@ def run(
                 caption=_reel_caption_text(result),
                 key_prefix=f"reels/{day_slug}",
                 cover=result.cover,
+                ig_user_id=settings.ig_user_id,
             )
 
     (out_dir / "_data" / "리포트.md").write_text(_report(result, settings), encoding="utf-8")
