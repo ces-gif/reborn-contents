@@ -159,3 +159,65 @@ def test_cover_shrinks_a_long_headline_instead_of_overflowing(tmp_path, logo):
     )
     with Image.open(out) as img:
         assert img.size == (1080, 1920)
+
+
+# ----------------------------------------------- 번호 뱃지 (손님이 예약하는 번호)
+
+
+def _num_photo(tmp_path):
+    """어두운 사진. 뱃지가 여기서도 보여야 한다."""
+    p = tmp_path / "dark.png"
+    Image.new("RGB", (900, 700), (58, 62, 70)).save(p)
+    return p
+
+
+def _badge_area(path):
+    """번호 뱃지가 놓이는 사진 좌상단 영역을 잘라 온다."""
+    from PIL import Image
+
+    from reborn import cardnews as C
+
+    with Image.open(path) as im:
+        box = (C.MARGIN + C.NUM_INSET, C.Y_PHOTO + C.NUM_INSET)
+        return im.convert("RGB").crop((box[0], box[1], box[0] + C.NUM_D, box[1] + C.NUM_D))
+
+
+def test_number_badge_is_drawn_on_the_photo(tmp_path, logo):
+    """손님이 번호를 보고 예약한다. 사진 위에 오렌지 동그라미로 찍혀야 한다."""
+    from reborn import branding as B
+    from reborn.cardnews import CardData, render_card
+
+    out = tmp_path / "c.png"
+    render_card(
+        CardData(number=7, product_name="싱크선반", one_liner="설명", sale_price=1000),
+        _num_photo(tmp_path), out, logo=logo,
+    )
+    colors = {c for _, c in _badge_area(out).getcolors(maxcolors=100000)}
+    assert B.ORANGE in colors          # 동그라미
+    assert (255, 255, 255) in colors   # 흰 숫자·테두리
+
+
+def test_no_badge_when_the_card_has_no_number(tmp_path, logo):
+    """번호를 안 주면 아무것도 안 그린다 — 예전 카드가 달라지지 않게."""
+    from reborn import branding as B
+    from reborn.cardnews import CardData, render_card
+
+    out = tmp_path / "c.png"
+    render_card(
+        CardData(product_name="싱크선반", one_liner="설명", sale_price=1000),
+        _num_photo(tmp_path), out, logo=logo,
+    )
+    assert B.ORANGE not in {c for _, c in _badge_area(out).getcolors(maxcolors=100000)}
+
+
+def test_a_three_digit_number_still_fits(tmp_path, logo):
+    """두 자리·세 자리도 동그라미를 넘치면 안 된다."""
+    from reborn import cardnews as C
+
+    for n in (9, 12, 108):
+        label = str(n)
+        for size in (74, 66, 58, 50):
+            font = C.B.font("extrabold", size)
+            if C.text_width(label, font) <= C.NUM_D - 34:
+                break
+        assert C.text_width(label, font) <= C.NUM_D - 34

@@ -388,10 +388,11 @@ def run(
     research.research_all(client, result.products, model=client.writing_model)
 
     # 4) 카드뉴스 만들기 ------------------------------------------------------
-    counters: dict[str, int] = {}
-    for product in result.published:
-        counters[product.source_name] = counters.get(product.source_name, 0) + 1
+    # 번호는 **하루 전체에서 하나씩** 매긴다. 손님이 이 번호로 예약을 걸기 때문에
+    # 리퍼/새상품이 각각 1번부터 시작하면 같은 번호가 두 개 생겨 주문이 엉킨다.
+    for index, product in enumerate(result.published, start=1):
         card = CardData(
+            number=index,
             product_name=product.product_name,
             one_liner=product.card_line,
             condition_note=product.card_condition,
@@ -408,7 +409,7 @@ def run(
             out_dir
             / "카드뉴스"
             / slugify(product.source_name)
-            / f"{counters[product.source_name]:02d}-{slugify(product.product_name)}.png"
+            / f"{index:02d}-{slugify(product.product_name)}.png"
         )
         render_card(card, product.best_photo, path, logo=logo)
         result.cards.append(path)

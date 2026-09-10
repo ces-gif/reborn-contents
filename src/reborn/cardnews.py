@@ -50,6 +50,7 @@ class CardData:
     condition_note: str = ""  # 가격표에 직원이 적어 둔 상태 (까짐·사용감·기스 등)
     original_price: int | None = None
     discount_pct: int | None = None
+    number: int | None = None   # 손님이 이 번호로 예약한다
     eyebrow: str = "오늘의 리본 특가"
     date_label: str = ""
     footer: str = "리본마켓 평택점 · 매장에서 직접 보고 구매하세요"
@@ -123,6 +124,36 @@ COND_PAD_X = 26
 COND_PAD_Y = 14
 COND_INSET = 24
 COND_BG = (27, 30, 38, 235)
+
+
+# 번호 뱃지 — 손님이 카드 번호를 보고 매장에 예약을 건다. 사진 위 왼쪽 모서리에
+# 올려서 어떤 상품 얘기인지 한눈에 붙게 한다 (상태 뱃지는 사진 아래라 안 겹친다).
+NUM_D = 132                  # 지름
+NUM_INSET = 18               # 사진 모서리에서 띄우는 거리
+
+
+def _draw_number(canvas: Image.Image, number: int | None) -> None:
+    if not number:
+        return
+    x0 = MARGIN + NUM_INSET
+    y0 = Y_PHOTO + NUM_INSET
+    badge = Image.new("RGBA", (NUM_D, NUM_D), (0, 0, 0, 0))
+    d = ImageDraw.Draw(badge)
+    # 흰 테두리를 둘러 어두운 사진에서도 동그라미가 살아 있게 한다
+    d.ellipse([0, 0, NUM_D - 1, NUM_D - 1], fill=(255, 255, 255, 235))
+    d.ellipse([6, 6, NUM_D - 7, NUM_D - 7], fill=B.ORANGE + (255,))
+
+    label = str(number)
+    for size in (74, 66, 58, 50):       # 두 자리, 세 자리도 안 넘치게
+        font = B.font("extrabold", size)
+        if text_width(label, font) <= NUM_D - 34:
+            break
+    tw = text_width(label, font)
+    ascent, descent = font.getmetrics()
+    # 숫자는 baseline 기준이라 시각 중심이 살짝 위다. descent 를 빼서 눈으로 맞춘다.
+    ty = (NUM_D - (ascent + descent)) // 2 - 2
+    d.text(((NUM_D - tw) // 2, ty), label, font=font, fill=(255, 255, 255))
+    canvas.paste(badge, (x0, y0), badge)
 
 
 def _draw_condition(draw: ImageDraw.ImageDraw, note: str) -> None:
@@ -208,6 +239,7 @@ def render_card(
         outline=(231, 233, 238),
         width=2,
     )
+    _draw_number(canvas, data.number)
     _draw_condition(draw, data.condition_note)
 
     # 8) 가격 바 — 오렌지 통짜, 화면 끝까지
