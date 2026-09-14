@@ -92,7 +92,7 @@ const header = grid([4700, 1900, 3491], [
       alignment: AlignmentType.CENTER,
       spacing: { after: 0, line: 240, lineRule: LineRuleType.AUTO },
       children: [
-        run('최  은  성    ', { bold: true, size: 18 }),
+        run('김  기  훈    ', { bold: true, size: 18 }),
         new ImageRun({ data: 도장, type: 'png', transformation: { width: 54, height: 54 } }),
       ],
     })],
