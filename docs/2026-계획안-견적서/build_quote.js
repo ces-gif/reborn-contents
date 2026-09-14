@@ -21,7 +21,7 @@ const cell = (o) => new TableCell({
   width: { size: o.w, type: WidthType.DXA },
   columnSpan: o.span, rowSpan: o.rowSpan, verticalAlign: VerticalAlign.CENTER,
   shading: o.fill ? { type: ShadingType.CLEAR, fill: o.fill, color: 'auto' } : undefined,
-  margins: { top: 70, bottom: 70, left: 100, right: 100 },
+  margins: { top: 52, bottom: 52, left: 100, right: 100 },
   children: [new Paragraph({
     alignment: o.align ?? AlignmentType.LEFT, spacing: { after: 0, line: 280 },
     children: [run(o.t ?? '', { bold: o.bold, size: o.size ?? 18, color: o.color })],
@@ -64,8 +64,8 @@ const 당사자 = table([1500, 3100, 1500, 3100], [
 
 const 명세 = table([600, 3300, 1000, 700, 1800, 1774], [
   R(HEAD('No'), HEAD('품            목'), HEAD('단가(원)'), HEAD('수량'), HEAD('금액(원)'), HEAD('비  고')),
-  R(ctr('1'), { t: '인건비 — 전문가 수당', bold: true }, ctr('-'), ctr('-'), won('3,500,000', { bold: true }), '강사·멘토·심사위원'),
-  R(ctr(''), '  창업 특강 강사료', won('500,000'), ctr('1명'), won('500,000'), '9.28 특강 2시간'),
+  R(ctr('1'), { t: '인건비 — 전문가 수당', bold: true }, ctr('-'), ctr('-'), won('3,250,000', { bold: true }), '강사·멘토·심사위원'),
+  R(ctr(''), '  창업 특강 강사료', won('250,000'), ctr('1명'), won('250,000'), '지급기준 나급 · 2시간'),
   R(ctr(''), '  1:1 창업 멘토링비', won('150,000'), ctr('10팀'), won('1,500,000'), '10.8 멘토링'),
   R(ctr(''), '  예선 서류 평가료', won('150,000'), ctr('2명'), won('300,000'), '10.15 서류평가'),
   R(ctr(''), '  결승 심사수당', won('400,000'), ctr('3명'), won('1,200,000'), '10.22 현직 VC'),
@@ -74,8 +74,8 @@ const 명세 = table([600, 3300, 1000, 700, 1800, 1774], [
   R(ctr(''), '  AI 코딩 도구 이용료', won('50,000'), ctr('30명'), won('1,500,000'), '10개 팀·팀당 3인'),
   R(ctr(''), '  홍보 및 인쇄비', ctr('-'), ctr('1식'), won('700,000'), '포스터·현수막·자료집·상장'),
   R(ctr(''), '  행사 운영비', ctr('-'), ctr('1식'), won('600,000'), '다과·식대·소모품'),
-  R(ctr('3'), '일반관리비', ctr('2.0%'), ctr('1식'), won('176,000'), '법정 한도 8% 이내'),
-  R(ctr('4'), '이윤', ctr('1.28%'), ctr('1식'), won('114,909'), '법정 한도 10% 이내'),
+  R(ctr('3'), '일반관리비', ctr('3.0%'), ctr('1식'), won('256,500'), '법정 한도 8% 이내'),
+  R(ctr('4'), '이윤', ctr('3.23%'), ctr('1식'), won('284,409'), '법정 한도 10% 이내'),
   R({ t: '소   계 (총원가)', span: 4, bold: true, fill: GRAYF, align: AlignmentType.CENTER }, won('9,090,909', { bold: true, fill: GRAYF }), { t: '', fill: GRAYF }),
   R({ t: '부 가 가 치 세 (10%)', span: 4, bold: true, fill: GRAYF, align: AlignmentType.CENTER }, won('909,091', { bold: true, fill: GRAYF }), { t: '', fill: GRAYF }),
   R({ t: '합 계 금 액', span: 4, bold: true, fill: NAVY, color: 'FFFFFF', align: AlignmentType.CENTER, size: 20 },
@@ -85,7 +85,7 @@ const 명세 = table([600, 3300, 1000, 700, 1800, 1774], [
 const doc = new Document({
   styles: { default: { document: { run: { font: F, size: 19 }, paragraph: { spacing: { line: 300 } } } } },
   sections: [{
-    properties: { page: { margin: { top: convertMillimetersToTwip(20), bottom: convertMillimetersToTwip(16), left: MARGIN, right: MARGIN } } },
+    properties: { page: { margin: { top: convertMillimetersToTwip(15), bottom: convertMillimetersToTwip(12), left: MARGIN, right: MARGIN } } },
     children: [
       P('견     적     서', { align: AlignmentType.CENTER, bold: true, size: 44, color: NAVY, spacing: 100, after: 100 }),
       new Paragraph({ spacing: { after: 150 }, border: { bottom: { style: BorderStyle.SINGLE, size: 14, color: NAVY, space: 0 } }, children: [] }),
@@ -94,10 +94,11 @@ const doc = new Document({
       P('아래와 같이 견적합니다.', { before: 180, after: 130 }),
       P('일금  일천만원정  (₩10,000,000)  ※ 부가가치세 포함', { bold: true, size: 24, color: NAVY, after: 150 }),
       명세,
-      P('※ 산출 근거는 별첨 「원가계산서」(총괄표·인건비·일반경비)를 따른다.', { before: 200, size: 17, color: GRAY, after: 60 }),
-      P('※ 시상금(2,500,000원)과 AI 코딩 도구 이용료(1,500,000원) 등 실비성 지출의 비중이 커, 일반관리비(2.0%)와 이윤(1.28%)은 지방계약법 시행규칙상 한도(각 8%, 10%)를 밑도는 수준으로 계상하였다.', { size: 17, color: GRAY, after: 60 }),
-      P('※ 본 견적은 협의용이며, 과업 내용 변경 시 금액이 조정될 수 있다.', { size: 17, color: GRAY, after: 240 }),
-      P('2026. 09. 01.', { align: AlignmentType.CENTER, size: 20, after: 150 }),
+      P('※ 산출 근거는 별첨 「원가계산서」(총괄표·인건비·일반경비·강사수당 지급기준)를 따른다.', { before: 140, size: 17, color: GRAY, after: 40 }),
+      P('※ 창업 특강 강사료는 발주처 「강사수당 지급기준」 나급(최초 1시간 170,000원 + 초과 매시간 80,000원, 2시간 250,000원)을 적용하였다.', { size: 17, color: GRAY, after: 40 }),
+      P('※ 시상금(2,500,000원)과 AI 코딩 도구 이용료(1,500,000원) 등 실비성 지출의 비중이 커, 일반관리비(3.0%)와 이윤(3.23%)은 지방계약법 시행규칙상 한도(각 8%, 10%)를 밑도는 수준으로 계상하였다.', { size: 17, color: GRAY, after: 40 }),
+      P('※ 본 견적은 협의용이며, 과업 내용 변경 시 금액이 조정될 수 있다.', { size: 17, color: GRAY, after: 150 }),
+      P('2026. 09. 01.', { align: AlignmentType.CENTER, size: 20, after: 110 }),
       P('(주) 리 본 마 켓      대표이사   최 은 성    (인)', { align: AlignmentType.CENTER, bold: true, size: 24, spacing: 30 }),
     ],
   }],
