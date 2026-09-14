@@ -1,7 +1,7 @@
 // 견 적 서 (1쪽) — 공급자 정보 중 사업자등록번호·주소·연락처는 확인되지 않아 빈칸으로 둔다.
 const fs = require('fs');
 const {
-  Document, Packer, Paragraph, TextRun, AlignmentType,
+  Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak,
   Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle,
   VerticalAlign, convertMillimetersToTwip,
 } = require('docx');
@@ -100,6 +100,37 @@ const doc = new Document({
       P('※ 본 견적은 협의용이며, 과업 내용 변경 시 금액이 조정될 수 있다.', { size: 17, color: GRAY, after: 150 }),
       P('2026. 09. 01.', { align: AlignmentType.CENTER, size: 20, after: 110 }),
       P('(주) 리 본 마 켓      대표이사   최 은 성    (인)', { align: AlignmentType.CENTER, bold: true, size: 24, spacing: 30 }),
+
+      // 별지 — 강사료 산출 근거. 본문 1쪽을 유지하기 위해 뒤쪽에 따로 붙인다
+      new Paragraph({ children: [new PageBreak()] }),
+      P('[ 별지 ]  강사수당 지급기준', { align: AlignmentType.CENTER, bold: true, size: 32, color: NAVY, spacing: 60, after: 100 }),
+      new Paragraph({ spacing: { after: 200 }, border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: NAVY, space: 0 } }, children: [] }),
+      P('발주처 「3. 강사수당 지급기준 — 가. 일반강의 강사수당」', { after: 160 }),
+      table([900, 3600, 2400, 1000, 1000, 974], [
+        R(HEAD('등급'), HEAD('적용대상 (일반)'), HEAD('적용대상 (공직자 등)'), HEAD('최초 1시간'), HEAD('초과 매시간'), HEAD('2시간')),
+        R(ctr('특1급'), '전직 장관(급) 및 광역자치단체장, 전직 국회의원, 전직 한국은행장, 전직 대학의 총장(이사장), 대기업 총수(부회장 이상)',
+          '장관(급)*, 광역자치단체장*, 국회의원*, 한국은행장*, 대학의 총장(이사장)', won('400,000'), won('300,000'), won('700,000')),
+        R(ctr('특2급'), '전직 차관(급) 및 기초자치단체장, 전직 공직유관단체장, 전직 전문대학 등의 총장(이사장), 대기업 임원, 중견기업 대표',
+          '차관(급), 기초자치단체장, 공직유관단체장, 전문대학 등의 총장(이사장), 대형언론사 총수', won('300,000'), won('200,000'), won('500,000')),
+        R(ctr('가급'), '전직 4급 이상 공무원, 전직 지방의회의원(의장 포함), 전직 공직유관단체 임원, 전직 대학의 교수(조교수 이상), 유명 예술인·종교인, 대기업 부장(급)·중견기업 임원·중소기업 대표, 전문직 3년 이상 실무경력자, 박사학위 취득 후 해당분야 3년 이상 실무경력자, 국가대표 지도자 및 국가대표 출신 강사',
+          '4급 이상 공무원, 지방의회의원(의장 포함), 공직유관단체 임원, 대학의 교수(조교수 이상), 초·중·고교의 장(이사장), 대형언론사 임원, 기타언론사 대표',
+          won('280,000'), won('120,000'), won('400,000')),
+        R({ t: '나급', bold: true, fill: 'FFF2CC', align: AlignmentType.CENTER },
+          { t: '전직 5급(상당) 공무원, 중견기업 부장(급)·중소기업 임원, 원어민 어학 강사(외국국적을 가진 자로서 해당 국가에서 고등교육을 이수한 자), 국가전문자격증을 가진 자로서 3년 이상 실무경력자, 기타 전문자격을 가진 자로서 5년 이상 실무경력자', bold: true, fill: 'FFF2CC' },
+          { t: '5급 이하 공무원, 공직유관단체 직원, 대학의 강사 등(교직원 포함), 초·중·고교의 교직원, 기타언론사 임원', bold: true, fill: 'FFF2CC' },
+          { t: '170,000', bold: true, fill: 'FFF2CC', align: AlignmentType.RIGHT },
+          { t: '80,000', bold: true, fill: 'FFF2CC', align: AlignmentType.RIGHT },
+          { t: '250,000', bold: true, fill: 'FFF2CC', align: AlignmentType.RIGHT }),
+        R(ctr('다급'), '전직 6급 이하 공무원, 외국어·전산 등 강사, 체육·레크리에이션 등 취미·소양 강사로서 해당분야 3년 이상(공공기관·공공교육훈련기관 경력) 또는 5년 이상(외부경력 포함) 강의 경력자',
+          '', won('100,000'), won('50,000'), won('150,000')),
+        R(ctr('라급'), '체육, 레크리에이션 등 취미·소양 강사', '', won('80,000'), won('40,000'), won('120,000')),
+        R(ctr('마급'), '각종 교육운영(실기실습 등) 보조자', '', won('60,000'), won('30,000'), won('90,000')),
+      ]),
+      P('1. 전문직 : 감정평가사, 건축사, 공인노무사, 공인회계사, 관세사, 기술사, 법무사, 변리사, 변호사, 보험계리사, 세무사, 약사, 의사', { before: 200, size: 17, color: GRAY, after: 40 }),
+      P('2. 특1급 초과 매시간은 300,000원이나, * 표시된 청탁금지법 적용 대상(공직자 등)은 200,000원을 적용한다.', { size: 17, color: GRAY, after: 40 }),
+      P('3. 본 견적의 창업 특강(2시간)은 나급을 적용하여 170,000원 + 80,000원 = 250,000원으로 계상하였다.', { size: 17, color: GRAY, after: 40 }),
+      P('4. 2025년 용역도 동일하게 나급을 적용하였다 (4시간 410,000원 / 3시간 330,000원).', { size: 17, color: GRAY, after: 40 }),
+      P('5. 강사가 중소기업 대표 등 가급 요건에 해당하면 2시간 400,000원까지 적용할 수 있다.', { size: 17, color: GRAY }),
     ],
   }],
 });
