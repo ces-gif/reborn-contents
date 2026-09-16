@@ -6,6 +6,27 @@ const {
   VerticalAlign, VerticalMergeType, HeightRule, LineRuleType, convertMillimetersToTwip,
 } = require('docx');
 
+// 두 판본을 같은 양식으로 찍는다. 8.25 최초 견적이 협의를 거쳐 9.1 확정본이 되었다.
+// 강사비와 시상금은 두 판본이 동일하고, 심사수당·홍보·운영비와 대행비만 내려갔다.
+const VARIANTS = {
+  final: {
+    날짜: '2026. 09. 01.',
+    심사수당단가: '400,000', 심사수당: '1,200,000',
+    홍보: '700,000', 운영: '600,000',
+    subTotal: '8,550,000', 대행비: '540,909', 대행비율: '일반관리비 3.0% + 이윤 3.23%',
+    vat제외: '9,090,909', 부가세: '909,091', 합계: '10,000,000',
+  },
+  initial: {
+    날짜: '2026. 08. 25.',
+    심사수당단가: '500,000', 심사수당: '1,500,000',
+    홍보: '850,000', 운영: '700,000',
+    subTotal: '9,100,000', 대행비: '900,000', 대행비율: '일반관리비 4.0% + 이윤 5.66%',
+    vat제외: '10,000,000', 부가세: '1,000,000', 합계: '11,000,000',
+  },
+};
+const V = VARIANTS[process.argv[4] || 'final'];
+if (!V) throw new Error('알 수 없는 판본: ' + process.argv[4]);
+
 const F = { ascii: '맑은 고딕', hAnsi: '맑은 고딕', eastAsia: '맑은 고딕', cs: '맑은 고딕', hint: 'eastAsia' };
 const GRAY = 'D9D9D9', TITLE_BG = 'BFBFBF', BLUE = 'DCE6F1', LINE = '808080', DIM = '767676';
 const MARGIN = convertMillimetersToTwip(16);
@@ -81,7 +102,7 @@ const L = (label, value) => ({
 
 const 도장 = fs.readFileSync(process.argv[3]);
 const header = grid([4700, 1900, 3491], [
-  R(L('수    신', '(재)고양산업진흥원'), LBL('견적일자'), ctr('2026. 09. 01.')),
+  R(L('수    신', '(재)고양산업진흥원'), LBL('견적일자'), ctr(V.날짜)),
   R(L('참    조', 'K-하이테크 플랫폼 지원단'), { t: '공  급  자', span: 2, bold: true, fill: GRAY, align: AlignmentType.CENTER, size: 19 }),
   R(L('과    업', '2026년 한국항공대학교 바이브 코딩 기반 학생창업 경진대회 및 창업 특강 운영'),
     LBL('사업자 등록번호'), ctr('209-88-03446')),
@@ -104,7 +125,7 @@ const header = grid([4700, 1900, 3491], [
 // ── 견적합계 ──────────────────────────────────────────────────────────────
 const totalBar = grid([4700, 5391], [
   R({ t: '견적합계 (VAT)포함', bold: true, fill: GRAY, align: AlignmentType.CENTER, size: 24 },
-    rgt('10,000,000', { bold: true, size: 26 })),
+    rgt(V.합계, { bold: true, size: 26 })),
 ]);
 
 // ── 예산 명세 ─────────────────────────────────────────────────────────────
@@ -125,23 +146,23 @@ const budget = grid(CW, [
     { t: '강사수당 지급기준 나급 · 2시간', size: 15 }),
   item('1-2', '1:1 창업 멘토링비', '1', '식', '150,000', '10', '팀', '1,500,000', '10.8 멘토링 · 팀당 60분'),
   item('1-3', '예선 서류 평가료', '1', '식', '150,000', '2', '인', '300,000', '10.15 내/외부 심사위원'),
-  item('1-4', '결승 심사수당', '1', '식', '400,000', '3', '인', '1,200,000', '10.22 현직 VC'),
+  item('1-4', '결승 심사수당', '1', '식', V.심사수당단가, '3', '인', V.심사수당, '10.22 현직 VC'),
   item('1-5', '시상금 및 부상', '1', '식', '-', '10', '팀', '2,500,000', '대상 100만 / 최우수 50만 / 우수 30만 / 장려 10만×7팀'),
   item('1-6', 'AI 코딩 도구 이용료', '1', '인', '50,000', '30', '인', '1,500,000', '멘토링 10개 팀 · 팀당 3인 기준'),
-  item('1-7', '홍보 및 인쇄비', '1', '식', '700,000', '1', '회', '700,000', '포스터 · 현수막 · 자료집 · 상장'),
-  item('1-8', '행사 운영비', '1', '식', '600,000', '1', '회', '600,000', '특강 다과 · 결승 식대 · 소모품'),
+  item('1-7', '홍보 및 인쇄비', '1', '식', V.홍보, '1', '회', V.홍보, '포스터 · 현수막 · 자료집 · 상장'),
+  item('1-8', '행사 운영비', '1', '식', V.운영, '1', '회', V.운영, '특강 다과 · 결승 식대 · 소모품'),
   R(CONT, { t: 'Sub Total', span: 7, bold: true, fill: GRAY, align: AlignmentType.CENTER },
-    rgt('8,550,000', { bold: true, fill: GRAY }), { t: '', fill: GRAY }),
+    rgt(V.subTotal, { bold: true, fill: GRAY }), { t: '', fill: GRAY }),
 
   R({ t: '최종 제안가', vmerge: VerticalMergeType.RESTART, bold: true, fill: BLUE, align: AlignmentType.CENTER },
-    { t: '프로그램 대행비 (일반관리비 3.0% + 이윤 3.23%)', span: 7, fill: GRAY, align: AlignmentType.CENTER },
-    rgt('540,909', { fill: GRAY }), { t: '', fill: GRAY }),
+    { t: `프로그램 대행비 (${V.대행비율})`, span: 7, fill: GRAY, align: AlignmentType.CENTER },
+    rgt(V.대행비, { fill: GRAY }), { t: '', fill: GRAY }),
   R(CONT, { t: '견적 합계 (VAT 제외)', span: 7, fill: GRAY, align: AlignmentType.CENTER },
-    rgt('9,090,909', { fill: GRAY }), { t: '', fill: GRAY }),
+    rgt(V.vat제외, { fill: GRAY }), { t: '', fill: GRAY }),
   R(CONT, { t: '부가가치세', span: 7, fill: GRAY, align: AlignmentType.CENTER },
-    rgt('909,091', { fill: GRAY }), { t: '', fill: GRAY }),
+    rgt(V.부가세, { fill: GRAY }), { t: '', fill: GRAY }),
   R(CONT, { t: '용역합계 (VAT 포함)', span: 7, bold: true, fill: BLUE, align: AlignmentType.CENTER, size: 19 },
-    rgt('10,000,000', { bold: true, fill: BLUE, size: 19 }), { t: '', fill: BLUE }),
+    rgt(V.합계, { bold: true, fill: BLUE, size: 19 }), { t: '', fill: BLUE }),
 ]);
 
 // ── 별지 : 강사수당 지급기준 ──────────────────────────────────────────────
