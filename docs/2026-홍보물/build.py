@@ -46,17 +46,23 @@ THEMES = {
               glowtxt='0 0 .18em rgba(34,230,255,.55),0 0 .5em rgba(155,124,255,.35)'),
 }
 
-def net(w, h, seed, t):
-    """A안 배경 — 노드 네트워크."""
+def net(w, h, seed, t, op=1.0):
+    """A안 배경 — 노드 네트워크.
+
+    선 굵기와 점 크기는 뷰박스 크기에 비례시킨다. 고정값을 쓰면 뷰박스가 작은
+    포스터에서만 선이 굵게 나와 글자를 덮는다. op로 판형별 농도를 조절한다.
+    """
     r = random.Random(seed)
+    k = min(w, h)
+    sw, r0, r1 = k * .0009, k * .0030, k * .0068
     pts = [(r.uniform(0, w), r.uniform(0, h)) for _ in range(46)]
     seg = [f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}"/>'
            for i, (x1, y1) in enumerate(pts) for x2, y2 in pts[i + 1:]
-           if ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** .5 < min(w, h) * .34]
-    dot = ''.join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r.uniform(1.6,4.2):.1f}"/>' for x, y in pts)
+           if ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** .5 < k * .34]
+    dot = ''.join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r.uniform(r0,r1):.2f}"/>' for x, y in pts)
     return (f'<svg class="bgart" viewBox="0 0 {w} {h}" preserveAspectRatio="none">'
-            f'<g stroke="{t["c1"]}" stroke-width=".7" fill="none" opacity=".18">{"".join(seg)}</g>'
-            f'<g fill="{t["c2"]}" opacity=".40">{dot}</g></svg>')
+            f'<g stroke="{t["c1"]}" stroke-width="{sw:.2f}" fill="none" opacity="{.18*op:.3f}">{"".join(seg)}</g>'
+            f'<g fill="{t["c2"]}" opacity="{.40*op:.3f}">{dot}</g></svg>')
 
 def grid(w, h, t, horizon=.52):
     """B안 배경 — 소실점으로 모이는 원근 그리드와 지평선 발광."""
@@ -208,13 +214,17 @@ h2{{font-family:'NSR';font-size:48mm;line-height:1.16;color:#fff;letter-spacing:
  <div class="bar">{BAR_ROWS}</div>
 </div>'''
 
-for theme, label in (('A', '기본형'), ('B', '미래형')):
-    for kind, stem in (('h', '현수막_5000x900'), ('x', 'X배너_600x1800')):
-        name = f'{stem}_{theme}안_{label}'
-        src = HERE / f'{name}.html'
-        src.write_text(page(kind, theme), encoding='utf-8')
-        subprocess.run([CHROME, '--headless', '--disable-gpu', '--no-sandbox',
-                        '--allow-file-access-from-files', '--font-render-hinting=none',
-                        f'--print-to-pdf={HERE / (name + ".pdf")}', '--no-pdf-header-footer',
-                        f'file://{src}'], check=True, capture_output=True)
-        print('  ', name + '.pdf')
+def main():
+  for theme, label in (('A', '기본형'), ('B', '미래형')):
+      for kind, stem in (('h', '현수막_5000x900'), ('x', 'X배너_600x1800')):
+          name = f'{stem}_{theme}안_{label}'
+          src = HERE / f'{name}.html'
+          src.write_text(page(kind, theme), encoding='utf-8')
+          subprocess.run([CHROME, '--headless', '--disable-gpu', '--no-sandbox',
+                          '--allow-file-access-from-files', '--font-render-hinting=none',
+                          f'--print-to-pdf={HERE / (name + ".pdf")}', '--no-pdf-header-footer',
+                          f'file://{src}'], check=True, capture_output=True)
+          print('  ', name + '.pdf')
+
+if __name__ == '__main__':
+    main()
