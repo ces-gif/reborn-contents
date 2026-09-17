@@ -11,7 +11,8 @@
 import base64, pathlib, random, subprocess
 
 HERE = pathlib.Path(__file__).parent
-LOGO = HERE.parent / 'logo'
+# 로고는 이 폴더 안(배포본) 또는 상위 폴더(작업본) 어느 쪽에나 있을 수 있다
+LOGO = HERE / 'logo' if (HERE / 'logo').is_dir() else HERE.parent / 'logo'
 CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 FONT = '/usr/share/fonts/truetype/nanum'
 
@@ -207,7 +208,7 @@ h2{{font-family:'NSR';font-size:48mm;line-height:1.16;color:#fff;letter-spacing:
   <div class="prize"><div class="k">총 시상 규모</div><div class="v">2,500,000원</div>
    <div class="d">대상 100만 · 최우수 50만 · 우수 30만 · 장려 10만 × 7팀</div></div>
   <div class="info">
-   <b>참가대상</b>  한국항공대학교 재학생 및 고양시민 (1~4인 팀)<br>
+   <b>참가대상</b>  고양시·경기북부 거주 대학(원)생 (개인 또는 1~4인 팀)<br>
    <b>장　　소</b>  한국항공대학교 대강당 · 스타트업 라운지<br>
    <b>참가문의</b>  (주)리본마켓 010-5843-0627</div>
  </div>

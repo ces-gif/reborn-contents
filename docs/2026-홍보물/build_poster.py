@@ -92,7 +92,7 @@ h2{{font-family:'NSR';font-size:6.15rem;line-height:1.14;color:#fff;letter-spaci
     <div class="d">대상 100만 · 최우수 50만<br>우수 30만 · 장려 10만 × 7팀</div></div>
    <div class="info">
     <div><div class="k">참가대상</div>
-     <div class="v">한국항공대학교 재학생 및 고양시민<br><small>개인 또는 1~4인 팀</small></div></div>
+     <div class="v">고양시·경기북부 거주 대학(원)생<br><small>대학원 포함 · 개인 또는 1~4인 팀</small></div></div>
     <div><div class="k">장소</div>
      <div class="v">한국항공대학교<br><small>대강당 · 스타트업 라운지</small></div></div>
     <div><div class="k">참가문의</div>
