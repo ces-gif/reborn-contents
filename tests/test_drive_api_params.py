@@ -176,3 +176,49 @@ def test_injected_service_is_never_rebuilt(monkeypatch):
 
     assert client._retry(flaky) == "ok"
     assert calls == ["fake", "fake"]
+
+
+def test_a_lost_response_does_not_create_the_file_twice(monkeypatch, tmp_path):
+    """올라갔는데 응답만 못 받고 끊기는 일이 있다.
+
+    그때 create 를 그대로 다시 부르면 같은 이름 파일이 두 개 생긴다
+    (09-18 일산 _data 의 리포트.md). 다시 시도할 땐 있는지 먼저 보고 update 해야 한다.
+    """
+    monkeypatch.setattr(drive_mod.time, "sleep", lambda s: None)
+
+    path = tmp_path / "리포트.md"
+    path.write_text("ok", encoding="utf-8")
+
+    class Files:
+        def __init__(self):
+            self.created = 0
+            self.updated = 0
+            self.stored: list[dict] = []
+
+        def list(self, **kwargs):
+            hit = [f for f in self.stored if f"name = '{f['name']}'" in kwargs["q"]]
+            return _Executable({"files": hit[:1]})
+
+        def create(self, **kwargs):
+            self.created += 1
+            # 드라이브에는 실제로 만들어졌는데, 응답을 받기 전에 연결이 끊겼다
+            self.stored.append({"id": "F1", "name": kwargs["body"]["name"]})
+            raise ssl.SSLEOFError("EOF occurred in violation of protocol")
+
+        def update(self, **kwargs):
+            self.updated += 1
+            return _Executable({"id": kwargs["fileId"]})
+
+    class Service:
+        def __init__(self):
+            self._files = Files()
+
+        def files(self):
+            return self._files
+
+    service = Service()
+    client = Drive(service=service)
+
+    assert client.upload(path, "DAY") == "F1"
+    assert service.files().created == 1  # 두 번 만들지 않았다
+    assert service.files().updated == 1  # 두 번째 시도는 덮어쓰기로 갔다

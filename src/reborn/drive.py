@@ -279,29 +279,36 @@ class Drive:
         """
         name = name or path.name
         mime_type = mime_type or _guess_mime(path)
-        media = MediaFileUpload(str(path), mimetype=mime_type, resumable=path.stat().st_size > 5_000_000)
-        existing = self.find_child(parent_id, name)
-        if existing:
-            file = self._retry(
-                lambda: self.service.files()
-                .update(fileId=existing, media_body=media, fields="id", supportsAllDrives=True)
-                .execute()
-            )
-        else:
-            body: dict = {"name": name, "parents": [parent_id]}
-            if as_doc:
-                body["mimeType"] = DOCS_MIME
-            file = self._retry(
-                lambda: self.service.files()
-                .create(
-                    body=body,
-                    media_body=media,
-                    fields="id",
-                    supportsAllDrives=True,
+        resumable = path.stat().st_size > 5_000_000
+        body: dict = {"name": name, "parents": [parent_id]}
+        if as_doc:
+            body["mimeType"] = DOCS_MIME
+
+        def put() -> dict:
+            """시도할 때마다 **있는지 다시 보고** 올린다.
+
+            앞선 시도가 사실은 성공했는데 응답만 못 받고 끊기는 일이 있다.
+            그때 create 를 그대로 다시 부르면 같은 이름 파일이 두 개 생긴다
+            (09-18 일산 _data 에 리포트.md 가 두 개 생겼다). 시도마다 다시 찾아보면
+            두 번째 시도는 update 로 넘어가 한 개로 끝난다.
+
+            MediaFileUpload 도 시도마다 새로 만든다 — 한 번 읽은 것은 다시 못 쓴다.
+            """
+            media = MediaFileUpload(str(path), mimetype=mime_type, resumable=resumable)
+            existing = self.find_child(parent_id, name)
+            if existing:
+                return (
+                    self.service.files()
+                    .update(fileId=existing, media_body=media, fields="id", supportsAllDrives=True)
+                    .execute()
                 )
+            return (
+                self.service.files()
+                .create(body=body, media_body=media, fields="id", supportsAllDrives=True)
                 .execute()
             )
-        return file["id"]
+
+        return self._retry(put)["id"]
 
     def trash(self, file_id: str) -> None:
         """파일을 휴지통으로 보낸다. 영구 삭제가 아니라 되돌릴 수 있다."""
@@ -396,18 +403,30 @@ def remote_name(path: Path) -> str:
 
 
 def _trash_extras(drive: Drive, parent_id: str, keep: set[str]) -> None:
-    """이번에 만들지 않은 파일을 휴지통으로 보낸다 (폴더는 건드리지 않는다)."""
+    """이번에 만들지 않은 파일을 휴지통으로 보낸다 (폴더는 건드리지 않는다).
+
+    같은 이름이 여러 개 있으면 **가장 나중 것만 남긴다.** 예전에 업로드가 끊겼다
+    다시 붙으면서 같은 이름 파일이 두 개 생긴 적이 있다. 직원이 어느 게 오늘
+    것인지 알 수 없으니 여기서도 치운다.
+    """
     try:
         existing = drive.list_children(parent_id)
     except Exception as exc:  # 정리에 실패했다고 발행을 멈추지는 않는다
         log.warning("예전 파일 정리를 건너뜁니다(%s): %s", parent_id, exc)
         return
+
+    # list_children 은 만든 순서대로 준다 — 이름별 마지막 것이 가장 최근 것이다.
+    newest = {item.name: item.id for item in existing if item.mime_type != FOLDER_MIME}
+
     for item in existing:
-        if item.mime_type == FOLDER_MIME or item.name in keep or item.name in PROTECTED_NAMES:
+        if item.mime_type == FOLDER_MIME or item.name in PROTECTED_NAMES:
+            continue
+        duplicate = item.name in keep
+        if duplicate and item.id == newest[item.name]:
             continue
         try:
             drive.trash(item.id)
-            log.info("예전 실행 파일 정리: %s", item.name)
+            log.info("%s: %s", "같은 이름 중복 정리" if duplicate else "예전 실행 파일 정리", item.name)
         except Exception as exc:
             log.warning("'%s' 를 치우지 못했습니다: %s", item.name, exc)
 

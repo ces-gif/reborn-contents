@@ -158,3 +158,30 @@ def test_a_leftover_txt_caption_is_cleaned_up(tmp_path):
     })
     upload_tree(drive, make_out_with_caption(tmp_path), "DAY")
     assert drive.trashed == ["id-2026-09-05-릴스캡션.txt"]
+
+
+def dup_file(name: str, suffix: str) -> DriveFile:
+    """같은 이름인데 아이디만 다른 파일. 업로드가 끊겼다 다시 붙으면 이렇게 생긴다."""
+    file = plain_file(name)
+    file.id = f"id-{name}-{suffix}"
+    return file
+
+
+def test_duplicate_of_a_kept_name_is_trashed_except_the_newest(tmp_path):
+    """09-18 일산 _data 에 리포트.md 가 두 개 생겼다. 어느 게 오늘 것인지 알 수 없다."""
+    drive = FakeDrive({
+        "DAY": [dup_file("리포트.md", "old"), dup_file("리포트.md", "new"), folder_file("카드뉴스")],
+        "DAY/카드뉴스": [plain_file("01-새상품.png")],
+    })
+    upload_tree(drive, make_out(tmp_path), "DAY")
+    assert drive.trashed == ["id-리포트.md-old"]
+
+
+def test_a_single_kept_file_is_never_trashed_as_a_duplicate(tmp_path):
+    """중복 정리를 넣다가 멀쩡한 파일까지 버리면 안 된다."""
+    drive = FakeDrive({
+        "DAY": [plain_file("리포트.md"), folder_file("카드뉴스")],
+        "DAY/카드뉴스": [plain_file("01-새상품.png")],
+    })
+    upload_tree(drive, make_out(tmp_path), "DAY")
+    assert drive.trashed == []
