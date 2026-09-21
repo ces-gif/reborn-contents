@@ -3,7 +3,7 @@
 // 원본은 한글 양식에 그대로 타이핑해 제출하고, 이 파일은 기재값 대조·검토용이다.
 const fs = require('fs');
 const {
-  Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak, ImageRun,
+  Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak,
   Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle,
   VerticalAlign, LineRuleType, convertMillimetersToTwip,
 } = require('docx');
@@ -24,10 +24,8 @@ const V = {
   주소: '경기도 평택시 이충로 49-29, 103호',
   사업자: '209-88-03446',
   연락처: '010-5843-0627',
-  날짜: '2026.   9.   21.',
 };
 const 귀하 = '고양산업진흥원 재무관 귀하';
-const 도장 = fs.readFileSync(process.argv[3]);
 
 const run = (t, o = {}) => new TextRun({
   text: t, bold: o.bold, color: o.color, size: o.size ?? 19, font: F, characterSpacing: o.spacing,
@@ -74,21 +72,20 @@ const R = (...c) => c;
 const LBL = (t) => ({ t, bold: true, fill: SOFT, align: AlignmentType.CENTER });
 const ctr = (t, o = {}) => ({ t, align: AlignmentType.CENTER, ...o });
 
-// 서명란 : 주소/상호/대표자 + 직인
+// 서명란 : 주소/상호/대표자 — 날짜·직인은 공란(출력 후 자필·날인)
 const 서명란 = (opts = {}) => {
   const rows = [];
   if (opts.주소 !== false) rows.push(['주    소 :  ' + V.주소, false]);
   rows.push(['상    호 :  ' + V.상호, false]);
   rows.push(['대 표 자 :  ' + V.대표자, true]);
   return [
-    P(V.날짜, { align: AlignmentType.CENTER, size: 21, before: 560, after: 420 }),
+    P('', { align: AlignmentType.CENTER, size: 21, before: 560, after: 420 }),
     ...rows.map(([t, seal]) => new Paragraph({
       alignment: AlignmentType.RIGHT,
-      spacing: { before: seal ? 260 : 0, after: 130, line: 240, lineRule: LineRuleType.AUTO },
+      spacing: { before: seal ? 200 : 0, after: 130, line: 240, lineRule: LineRuleType.AUTO },
       indent: { right: 900 },
       children: seal
-        ? [run(t, { size: 21 }), run('        ', { size: 21 }),
-           new ImageRun({ data: 도장, type: 'png', transformation: { width: 50, height: 50 } })]
+        ? [run(t, { size: 21 }), run('        (인)', { size: 21 })]
         : [run(t, { size: 21 })],
     })),
     P(귀하, { align: AlignmentType.CENTER, bold: true, size: 22, before: 420 }),
@@ -113,7 +110,7 @@ const 체크 = [
     R(ctr('3)'), '청렴계약 이행 서약서', mark('작성완료'), '본 파일 2쪽'),
     R(ctr('4)'), '계약보증금 지급 각서', mark('작성완료'), '3천만원 이하 → 보증보험 불요'),
     R(ctr('5)'), '안전보건관리 준수 서약서', mark('작성완료'), '본 파일 4쪽'),
-    R(ctr('6)'), '각서 · 수의계약 배제사유 자가평가표', mark('확인필요'), '업종(등록)란만 미기재'),
+    R(ctr('6)'), '각서 · 수의계약 배제사유 자가평가표', mark('작성완료'), '업종(등록) : 경영컨설팅업'),
     R(ctr('7)'), '수의계약 체결 제한 여부 확인서', mark('작성완료'), '법인 기준 체크 완료'),
   ]),
 
@@ -132,6 +129,7 @@ const 체크 = [
 
   P('3. 표준계약서 (진흥원 제공 1번 파일)', { bold: true, size: 22, before: 320, after: 140 }),
   P('상호·사업자등록번호·주소·대표자·연락처·계약금액·계약기간이 진흥원 측에서 이미 기재되어 있어 별도 작성이 필요하지 않다. 2부 출력하여 대표란에 날인하고 계약일자는 공란으로 둔다. 간인은 발주처 계약 천공으로 갈음한다.', { size: 18 }),
+  P('※ 본 작성본은 모든 날짜와 직인을 공란으로 두었다. 출력 후 각 서식의 날짜란을 자필 기재하고 대표자(인)란에 법인인감 또는 사용인감을 날인한다.', { size: 18, color: WARN }),
 ];
 
 // ══════════════════════════════════════════════════════ 1. 청렴계약 서약서
@@ -146,14 +144,13 @@ const 청렴 = [
   법조('⑤ 제1항 내지 제4항의 규정에 의하여 입찰참가자격을 제한하는 고양시의 처분을 받은 자는 고양시를 상대로 손해배상을 청구하거나 배제하는 입찰에 관하여 민ㆍ형사상 이의를 제기하지 않는다.'),
   법조('제4조(계약해지 등) 입찰과정에서 거짓 서류를 제출하여 부당하게 낙찰 받은 자 및 입찰, 낙찰, 계약체결 또는 계약이행 과정에서 관계 공무원 등에게 직접 또는 간접적으로 사례, 증여, 금품·향응 등을 제공한 사실이 드러날 경우에는 정해진 바에 의하여 당해 계약에 대한 조치를 받는다.'),
   법조('제5조(기타사항) 계약상대자는 임․직원(하도급업체 포함)과 대리인이 관계공무원에게 뇌물을 제공하거나 담합 등 불공정행위를 하지 않도록 하는 업체윤리강령과 내부비리 제보자에 대하여도 일체의 불이익 처분을 하지 않는 사규를 제정하도록 적극 노력한다.'),
-  P(V.날짜, { align: AlignmentType.CENTER, size: 21, before: 520, after: 420 }),
+  P('', { align: AlignmentType.CENTER, size: 21, before: 520, after: 420 }),
   new Paragraph({ alignment: AlignmentType.RIGHT, indent: { right: 900 },
     spacing: { after: 130, line: 240, lineRule: LineRuleType.AUTO },
     children: [run('서약자     상    호 :  ' + V.상호, { size: 21 })] }),
   new Paragraph({ alignment: AlignmentType.RIGHT, indent: { right: 900 },
-    spacing: { before: 260, after: 130, line: 240, lineRule: LineRuleType.AUTO },
-    children: [run('대 표 자 :  ' + V.대표자, { size: 21 }), run('        ', { size: 21 }),
-               new ImageRun({ data: 도장, type: 'png', transformation: { width: 50, height: 50 } })] }),
+    spacing: { before: 200, after: 130, line: 240, lineRule: LineRuleType.AUTO },
+    children: [run('대 표 자 :  ' + V.대표자, { size: 21 }), run('        (인)', { size: 21 })] }),
   P(귀하, { align: AlignmentType.CENTER, bold: true, size: 22, before: 420 }),
 ];
 
@@ -192,7 +189,7 @@ const 각서 = [
     R(LBL('업 체 명'), V.상호),
     R(LBL('대 표 자'), V.대표자.replace(/ /g, '')),
     R(LBL('소 재 지'), V.주소),
-    R(LBL('업종(등록)'), { t: '(사업자등록증상 업태·종목 기재)', color: WARN }),
+    R(LBL('업종(등록)'), '경영컨설팅업'),
   ]),
   P('상기 본인(법인)은 귀 기관과 수의계약을 체결함에 있어서 붙임 배제사유 중 어느 사유에도 해당되지 않으며 차후에 이러한 사실이 발견된 경우 계약의 해제ㆍ해지 및 부정당업자 제재 처분을 받아도 하등의 이유를 제기하지 않겠습니다.', { before: 300 }),
   P('붙임 :  <별표1> 수의계약 배제사유 1부.', { before: 180, size: 18 }),
@@ -238,7 +235,7 @@ const 확인 = [
   grid([1500, 3200, 1500, 3439], [
     R({ t: '발 주 자', bold: true, fill: GRAY, align: AlignmentType.CENTER, span: 4 }),
     R(LBL('발주기관'), '고양산업진흥원', LBL('발주부서'), 'ESG경영팀'),
-    R(LBL('발주날짜'), '2026.   9.', LBL('발주내용'), '[  ] 공사   [√] 용역   [  ] 물품   [  ] 기타'),
+    R(LBL('발주날짜'), '', LBL('발주내용'), '[  ] 공사   [√] 용역   [  ] 물품   [  ] 기타'),
     R(LBL('계약명'), { t: V.계약명, span: 3, size: 16 }),
     R(LBL('수의계약 사유'), { t: '「지방자치단체를 당사자로 하는 계약에 관한 법률 시행령」 제25조', span: 3, size: 16 }),
   ]),
@@ -260,11 +257,10 @@ const 확인 = [
       { t: '[  ] 예   [√] 아니오', align: AlignmentType.CENTER, size: 15, tight: true }),
   ]),
   P('「공직자의 이해충돌 방지법」 제12조에 따른 수의계약 체결 제한에 대하여 위와 같이 확인합니다. 만약 위 사항이 사실과 다른 경우에는 어떠한 처벌이나 불이익도 감수할 것을 서약합니다.', { before: 120, size: 17 }),
-  P('2026년    9월    21일', { align: AlignmentType.CENTER, size: 21, before: 180, after: 170 }),
+  P('', { align: AlignmentType.CENTER, size: 21, before: 180, after: 170 }),
   new Paragraph({ alignment: AlignmentType.RIGHT, indent: { right: 900 },
     spacing: { after: 120, line: 240, lineRule: LineRuleType.AUTO },
-    children: [run('계약상대자(확인인)   회사명 :  ' + V.상호, { size: 21 }), run('     ', { size: 21 }),
-               new ImageRun({ data: 도장, type: 'png', transformation: { width: 50, height: 50 } })] }),
+    children: [run('계약상대자(확인인)   회사명 :  ' + V.상호, { size: 21 }), run('     (인)', { size: 21 })] }),
   P(귀하, { align: AlignmentType.CENTER, bold: true, size: 22, before: 190 }),
   P('※ 법인은 ①~⑥을 「해당없음」, ⑦·⑧을 「예/아니오」로 표기한다. (공직자의 이해충돌 방지제도 운영지침 [별지 제10호 서식])', { before: 300, size: 16, color: DIM }),
 ];
