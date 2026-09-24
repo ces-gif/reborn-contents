@@ -96,7 +96,7 @@ h2{{font-family:'NSR';font-size:6.15rem;line-height:1.14;color:#fff;letter-spaci
     <div><div class="k">장소</div>
      <div class="v">한국항공대학교<br><small>대강당 · 스타트업 라운지</small></div></div>
     <div><div class="k">참가문의</div>
-     <div class="v">(주)리본마켓<br><small>010-5843-0627</small></div></div>
+     <div class="v">(주)리본마켓<br><small>ces@rebornmarket.org</small></div></div>
    </div>
   </div>
  </div>

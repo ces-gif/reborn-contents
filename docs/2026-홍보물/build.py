@@ -208,9 +208,9 @@ h2{{font-family:'NSR';font-size:48mm;line-height:1.16;color:#fff;letter-spacing:
   <div class="prize"><div class="k">총 시상 규모</div><div class="v">2,500,000원</div>
    <div class="d">대상 100만 · 최우수 50만 · 우수 30만 · 장려 10만 × 7팀</div></div>
   <div class="info">
-   <b>참가대상</b>  고양시·경기북부 거주 대학(원)생 (개인 또는 1~4인 팀)<br>
+   <b>참가대상</b>  고양시·경기북부 거주 대학(원)생 <span style="white-space:nowrap">(개인 또는 1~4인 팀)</span><br>
    <b>장　　소</b>  한국항공대학교 대강당 · 스타트업 라운지<br>
-   <b>참가문의</b>  (주)리본마켓 010-5843-0627</div>
+   <b>참가문의</b>  (주)리본마켓 ces@rebornmarket.org</div>
  </div>
  <div class="bar">{BAR_ROWS}</div>
 </div>'''
