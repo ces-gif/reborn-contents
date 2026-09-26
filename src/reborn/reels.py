@@ -25,6 +25,8 @@ log = logging.getLogger(__name__)
 FPS = 30
 MIN_DURATION = 3.2  # 인스타 최소 3초. 살짝 여유를 둔다.
 DEFAULT_SECONDS_PER_CARD = 0.8
+FADE_OUT = 0.6  # 끝에서 음악을 이만큼 줄인다 (뚝 끊기면 듣기 싫다)
+MUSIC_VOLUME = 0.85
 
 
 class FfmpegMissing(RuntimeError):
@@ -62,17 +64,49 @@ def plan_durations(
     return durations
 
 
+def audio_args(music: Path | None, total_seconds: float) -> tuple[list[str], list[str]]:
+    """오디오 입력 인자와 필터 인자.
+
+    음악이 있으면 영상 길이에 맞춰 **반복 재생하고 끝에서 페이드아웃**한다. 주제곡이
+    영상보다 짧아도 끊기지 않고, 길어도 뚝 잘리지 않는다. 음악이 없으면 예전처럼
+    무음 트랙을 넣는다 — 릴스는 오디오 트랙이 아예 없으면 처리에서 실패한 적이 있다.
+    """
+    if music is None:
+        return (
+            ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"],
+            [],
+        )
+    fade_start = max(0.0, total_seconds - FADE_OUT)
+    chain = (
+        f"volume={MUSIC_VOLUME},"
+        f"afade=t=out:st={fade_start:.3f}:d={FADE_OUT},"
+        "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo"
+    )
+    # -stream_loop -1 은 입력 **앞**에 와야 그 입력에만 걸린다
+    return (["-stream_loop", "-1", "-i", str(music.resolve())], ["-af", chain])
+
+
 def build_slideshow(
     cards: list[Path],
     out_path: Path,
     *,
     seconds_per_card: float = DEFAULT_SECONDS_PER_CARD,
+    music: Path | None = None,
 ) -> Path:
-    """카드들을 순서대로 이어 붙인 세로 영상을 만든다."""
+    """카드들을 **번호 순서 그대로** 이어 붙인 세로 영상을 만든다.
+
+    순서는 손님에게 중요하다 — 카드에 붙은 번호로 예약을 걸기 때문에, 영상이
+    1·2·3 순서로 흘러야 "몇 번이요" 가 통한다. 여기서는 받은 목록을 절대
+    다시 정렬하지 않는다.
+    """
     if not cards:
         raise ValueError("영상으로 만들 카드가 없습니다")
+    if music is not None and not Path(music).exists():
+        log.warning("주제곡 파일이 없어 무음으로 만듭니다: %s", music)
+        music = None
 
     durations = plan_durations(len(cards), seconds_per_card=seconds_per_card)
+    total = sum(durations)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -87,14 +121,15 @@ def build_slideshow(
         lines.append(f"file '{str(cards[-1].resolve())}'")
         listing.write_text("\n".join(lines), encoding="utf-8")
 
+        audio_in, audio_filter = audio_args(music, total)
         cmd = [
             ffmpeg_exe(), "-y", "-hide_banner", "-loglevel", "error",
             "-f", "concat", "-safe", "0", "-i", str(listing),
-            # 무음 오디오 트랙 — 릴스는 오디오가 없으면 처리에서 실패하는 경우가 있다
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+            *audio_in,
             "-shortest",
             # 홀수 픽셀이면 H.264 가 거부한다. 짝수로 맞추고 비율은 건드리지 않는다.
             "-vf", f"fps={FPS},scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
+            *audio_filter,
             "-c:v", "libx264", "-preset", "medium", "-crf", "20",
             "-c:a", "aac", "-b:a", "128k",
             "-movflags", "+faststart",
@@ -105,7 +140,7 @@ def build_slideshow(
             raise RuntimeError(f"릴스 영상 생성 실패: {result.stderr.strip()[:400]}")
 
     log.info(
-        "릴스 영상 생성: %s (카드 %d장, 약 %.1f초)",
-        out_path.name, len(cards), sum(durations),
+        "릴스 영상 생성: %s (카드 %d장, 약 %.1f초, 음악 %s)",
+        out_path.name, len(cards), total, music.name if music else "없음",
     )
     return out_path

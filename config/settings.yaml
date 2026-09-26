@@ -92,6 +92,9 @@ instagram:
   reel_seconds_per_card: 0.8
   # 릴스 맨 앞 표지에 크게 들어갈 문구.
   reel_headline: 오늘의 추천템
+  # 릴스에 깔 주제곡 (저장소 기준 경로). 매장마다 다른 곡을 쓰므로 아래 stores 에서
+  # 덮어쓴다. 파일이 없으면 무음으로 만든다 — 음악 때문에 영상이 안 나오는 일은 없다.
+  reel_music: ""
 
 # ---------------------------------------------------------------- 매장 목록
 # 위 공통 설정 위에 매장마다 다른 값만 덮어쓴다. 하루 실행에서 순서대로 다 돈다.
@@ -123,6 +126,9 @@ stores:
       parking_note: "*건물 건너편 무료 공영주차장 있음!"
     card:
       sale_label: "리본마켓 초특가"
+    instagram:
+      # 리본마켓 주제곡. assets/music/ 에 파일을 넣으면 그날 릴스부터 깔린다.
+      reel_music: "assets/music/reborn-theme.mp3"
 
   - id: "fox-ils"
     drive:
@@ -157,3 +163,6 @@ stores:
       parking_note: "*매장 건물 주차장 있음 (매우 넓어요!)"
     card:
       sale_label: "여우마켓 초특가"
+    instagram:
+      # 여우마켓 주제곡. assets/music/ 에 파일을 넣으면 그날 릴스부터 깔린다.
+      reel_music: "assets/music/fox-theme.mp3"

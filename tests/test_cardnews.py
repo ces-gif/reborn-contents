@@ -221,3 +221,59 @@ def test_a_three_digit_number_still_fits(tmp_path, logo):
             if C.text_width(label, font) <= C.NUM_D - 34:
                 break
         assert C.text_width(label, font) <= C.NUM_D - 34
+
+
+# ------------------------------------------------- 헤더가 사진을 침범하지 않는지
+
+from reborn import cardnews  # noqa: E402
+
+STANLEY_NAME = "스탠리 트랜짓 트위스트플립 머그 354ml 피치 로즈"
+STANLEY_DESC = "뚜껑을 돌려서 여는 트위스트락 방식의 스테인리스 보온보냉 머그"
+
+
+def test_두_줄짜리_설명이_사진을_파고들지_않는다():
+    """09-26 스탠리 머그 카드에서 설명 둘째 줄이 사진에 잘려 들어갔다."""
+    head = cardnews.plan_header(STANLEY_NAME, STANLEY_DESC, logo_height=78)
+    assert len(head.desc_lines) == 2
+    assert head.desc_bottom <= cardnews.Y_PHOTO
+
+
+def test_설명이_길어지면_상품명이_위로_올라간다():
+    """설명이 두 줄이면 상품명 블록이 그만큼 위로 밀려야 한다."""
+    short = cardnews.plan_header(STANLEY_NAME, "짧은 설명", logo_height=78)
+    long = cardnews.plan_header(STANLEY_NAME, STANLEY_DESC, logo_height=78)
+    assert long.name_top < short.name_top
+
+
+def test_헤더가_로고를_덮지_않는다():
+    """로고가 큰 매장(여우마켓)에서도 눈썹 문구가 로고 아래에 있어야 한다."""
+    for logo_height in (78, 120, cardnews.LOGO_MAX_H):
+        head = cardnews.plan_header(STANLEY_NAME, STANLEY_DESC, logo_height=logo_height)
+        floor = cardnews.Y_LOGO + logo_height + cardnews.LOGO_CLEAR
+        assert head.eyebrow_top >= floor, f"로고 높이 {logo_height} 에서 눈썹이 로고를 덮는다"
+        assert head.desc_bottom <= cardnews.Y_PHOTO
+
+
+def test_자리가_모자라면_상품명_글자를_줄인다():
+    """로고가 가장 큰 경우엔 제목을 줄여서라도 겹치지 않게 한다."""
+    roomy = cardnews.plan_header(STANLEY_NAME, STANLEY_DESC, logo_height=78)
+    tight = cardnews.plan_header(STANLEY_NAME, STANLEY_DESC, logo_height=cardnews.LOGO_MAX_H)
+    assert tight.name_font.size < roomy.name_font.size
+
+
+def test_설명이_없으면_예전_자리_그대로(tmp_path, logo, photo):
+    head = cardnews.plan_header("쿠쿠 6인용 밥솥", "", logo_height=78)
+    assert head.desc_lines == []
+    assert head.name_top + 0 <= cardnews.Y_NAME_BOTTOM
+
+
+def test_긴_이름과_긴_설명도_카드가_그려진다(tmp_path, logo, photo):
+    out = render_card(
+        CardData(
+            product_name=STANLEY_NAME, one_liner=STANLEY_DESC,
+            sale_price=11400, original_price=38000, number=13,
+        ),
+        photo, tmp_path / "card.png",
+    )
+    with Image.open(out) as img:
+        assert img.size == (1080, 1920)

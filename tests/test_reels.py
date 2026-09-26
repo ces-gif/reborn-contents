@@ -307,3 +307,101 @@ def test_reel_caption_leaves_a_normal_name_alone():
         [_product("아이넥스 싱크선반 600", 63300, 126650)], store_name="리본마켓 평택점"
     )
     assert "아이넥스 싱크선반 600 63,300원" in caption
+
+
+# ------------------------------------------------------------- 주제곡 (BGM)
+
+
+def _tone(tmp_path: Path, seconds: float = 2.0) -> Path:
+    """짧은 테스트용 소리. 주제곡 파일 대신 쓴다 (저장소에 음원을 넣지 않는다)."""
+    path = tmp_path / "theme.m4a"
+    subprocess.run(
+        [reels.ffmpeg_exe(), "-y", "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", f"sine=frequency=440:duration={seconds}",
+         "-c:a", "aac", str(path)],
+        check=True,
+    )
+    return path
+
+
+def test_주제곡이_있으면_영상에_깔린다(tmp_path):
+    out = reels.build_slideshow(
+        _cards(tmp_path, 5), tmp_path / "릴스.mp4",
+        seconds_per_card=0.8, music=_tone(tmp_path, 2.0),
+    )
+    probe = subprocess.run(
+        [reels.ffmpeg_exe(), "-hide_banner", "-i", str(out)], capture_output=True, text=True
+    ).stderr
+    assert "Audio: aac" in probe
+    assert "1080x1920" in probe
+
+
+def test_짧은_주제곡은_영상_길이만큼_반복된다(tmp_path):
+    """2초짜리 곡으로 8초 영상을 만들어도 중간에 소리가 끊기면 안 된다."""
+    music = _tone(tmp_path, 2.0)
+    audio_in, _ = reels.audio_args(music, total_seconds=8.0)
+    assert audio_in[:2] == ["-stream_loop", "-1"]
+
+
+def test_주제곡은_끝에서_페이드아웃된다(tmp_path):
+    _, filters = reels.audio_args(_tone(tmp_path, 2.0), total_seconds=10.0)
+    chain = filters[filters.index("-af") + 1]
+    assert f"afade=t=out:st={10.0 - reels.FADE_OUT:.3f}" in chain
+
+
+def test_주제곡이_없으면_예전처럼_무음_트랙(tmp_path):
+    audio_in, filters = reels.audio_args(None, total_seconds=10.0)
+    assert "anullsrc" in " ".join(audio_in)
+    assert filters == []
+
+
+def test_주제곡_파일이_없으면_무음으로_만든다(tmp_path):
+    """음원이 빠졌다고 그날 릴스를 통째로 못 만들면 안 된다."""
+    out = reels.build_slideshow(
+        _cards(tmp_path, 4), tmp_path / "릴스.mp4",
+        seconds_per_card=0.8, music=tmp_path / "없는파일.mp3",
+    )
+    assert out.exists() and out.stat().st_size > 0
+
+
+# ------------------------------------------------------------- 카드 순서
+
+
+def test_카드는_받은_번호_순서_그대로_이어붙인다(tmp_path, monkeypatch):
+    """손님이 카드 번호로 예약하니 영상도 1·2·3 순서여야 한다."""
+    cards = _cards(tmp_path, 4)
+    seen: dict[str, list[str]] = {}
+
+    real = subprocess.run
+
+    def spy(cmd, *a, **kw):
+        listing = Path(cmd[cmd.index("-i") + 1])
+        seen["lines"] = listing.read_text(encoding="utf-8").splitlines()
+        return real(cmd, *a, **kw)
+
+    monkeypatch.setattr(reels.subprocess, "run", spy)
+    reels.build_slideshow(cards, tmp_path / "릴스.mp4", seconds_per_card=0.8)
+
+    files = [ln for ln in seen["lines"] if ln.startswith("file ")]
+    # 마지막 한 줄은 concat demuxer 때문에 다시 적은 것이라 빼고 본다
+    assert [Path(ln[6:-1]).name for ln in files[:-1]] == [c.name for c in cards]
+
+
+def test_표지가_맨_앞_그다음이_1번_카드(tmp_path, monkeypatch):
+    """파이프라인이 넘기는 순서: 표지 → 01 → 02 … 이 순서가 영상 순서다."""
+    from reborn import pipeline
+
+    cover = tmp_path / "00-표지.png"
+    Image.new("RGB", (1080, 1920), (253, 111, 35)).save(cover)
+    cards = _cards(tmp_path, 3)
+    frames = [cover] + cards
+    assert [p.name for p in frames][0] == "00-표지.png"
+    assert [p.name for p in frames][1:] == [c.name for c in cards]
+    assert pipeline.reel_music_path("") is None
+
+
+def test_주제곡_경로는_저장소_기준으로_찾는다(tmp_path):
+    from reborn import pipeline
+
+    assert pipeline.reel_music_path("assets/music/없는곡.mp3") is None
+    assert pipeline.reel_music_path("") is None

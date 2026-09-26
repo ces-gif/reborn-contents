@@ -24,7 +24,7 @@ from . import branding, instagram, llm, notify, reels, research, social
 from .llm import LLMQuotaError
 from .blog import write_post
 from .cardnews import CardData, render_card, render_cover
-from .config import ASSETS, Settings, Source
+from .config import ASSETS, REPO_ROOT, Settings, Source
 from .drive import Drive, DriveFile, upload_tree
 from .grouping import capture_time, filter_for_day, group_by_content
 from .imaging import exif_capture_time
@@ -87,6 +87,19 @@ class RunResult:
 def make_llm(settings: Settings):
     """설정에 맞는 모델 공급자를 만든다 (제미나이 무료 / Claude 유료)."""
     return llm.make_client(settings)
+
+
+def reel_music_path(setting: str) -> Path | None:
+    """릴스에 깔 주제곡 경로. 설정이 비었거나 파일이 없으면 None(무음)."""
+    if not (setting or "").strip():
+        return None
+    path = Path(setting)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    if not path.exists():
+        log.warning("주제곡 파일이 없어 무음으로 만듭니다: %s", path)
+        return None
+    return path
 
 
 def ensure_logo(drive: Drive | None, settings: Settings):
@@ -453,11 +466,13 @@ def run(
             log.warning("릴스 캡션 생성 실패: %s", exc)
 
         try:
+            # 표지 → 1번 → 2번 … 카드 번호 순서 그대로. 손님이 이 번호로 예약한다.
             frames = ([result.cover] if result.cover else []) + result.cards
             result.reel_video = reels.build_slideshow(
                 frames,
                 reel_dir / f"{day_slug}-릴스.mp4",
                 seconds_per_card=settings.reel_seconds_per_card,
+                music=reel_music_path(settings.reel_music),
             )
         except Exception as exc:
             # 조용히 넘기지 않는다. 리포트에 남겨야 영상이 왜 없는지 알 수 있다.

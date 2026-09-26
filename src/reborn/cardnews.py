@@ -41,6 +41,15 @@ Y_PRICE = 1470
 PRICE_H = 350
 Y_FOOTER = 1820
 
+# 헤더 덩어리(눈썹·상품명·소개)를 쌓을 때 쓰는 최소 여백.
+DESC_PHOTO_GAP = 18  # 소개 문구 아랫변과 사진 윗변 사이
+NAME_DESC_GAP = 22  # 상품명 아랫변과 소개 문구 윗변 사이
+LOGO_CLEAR = 16  # 로고 아랫변과 눈썹 문구 사이
+EYEBROW_GAP = 18  # 눈썹 문구와 상품명 사이
+
+NAME_SIZES = [76, 68, 60, 54, 48, 42]
+DESC_SIZES = [38, 34, 30]
+
 
 @dataclass
 class CardData:
@@ -177,6 +186,85 @@ def _draw_condition(draw: ImageDraw.ImageDraw, note: str) -> None:
     )
     draw.text((x0 + COND_PAD_X, y0 + COND_PAD_Y), label, font=font, fill=(255, 255, 255))
 
+def _block_height(lines: list[str], fnt, gap: int) -> int:
+    ascent, descent = fnt.getmetrics()
+    return len(lines) * (ascent + descent) + max(0, len(lines) - 1) * gap
+
+
+def _fit_desc(text: str) -> tuple[list[str], object, int]:
+    """한 줄 소개. 두 줄이 되면 사진을 밀어내지 않게 글자를 한 단계 줄인다."""
+    if not text.strip():
+        return [], B.font("medium", DESC_SIZES[0]), 0
+    lines, fnt = fit_lines(text, lambda s: B.font("medium", s), CONTENT_W, 2, DESC_SIZES)
+    return lines, fnt, _block_height(lines, fnt, 6)
+
+
+def _fit_name(text: str, bottom: int, ceiling: int) -> tuple[list[str], object, int]:
+    """상품명 블록. 아랫변을 bottom 에 맞추되 윗변이 ceiling 위로 올라가지 않게 한다.
+
+    ceiling 은 로고와 눈썹 문구가 차지한 자리다. 긴 상품명이 두 줄이 되고 소개까지
+    두 줄이면 헤더가 위로 밀려 로고를 덮는데, 그때는 상품명을 줄여서 막는다.
+    """
+    for size in NAME_SIZES:
+        fnt = B.font("extrabold", size)
+        lines = wrap(text, fnt, CONTENT_W)
+        if len(lines) > 2:
+            continue
+        height = _block_height(lines, fnt, 8)
+        if bottom - height >= ceiling:
+            return lines, fnt, height
+    # 가장 작은 크기로도 안 들어가면 두 줄로 자르고 말줄임표를 붙인다
+    lines, fnt = fit_lines(
+        text, lambda s: B.font("extrabold", s), CONTENT_W, 2, [NAME_SIZES[-1]]
+    )
+    return lines, fnt, _block_height(lines, fnt, 8)
+
+
+@dataclass
+class HeaderLayout:
+    """눈썹 문구 · 상품명 · 한 줄 소개를 어디에 어떤 크기로 그릴지."""
+
+    eyebrow_top: int
+    name_lines: list[str]
+    name_font: object
+    name_top: int
+    desc_lines: list[str]
+    desc_font: object
+    desc_top: int
+    desc_bottom: int
+
+
+def plan_header(product_name: str, one_liner: str, logo_height: int) -> HeaderLayout:
+    """헤더를 **아래에서 위로** 쌓는다.
+
+    예전에는 소개 문구를 고정 위치(Y_DESC)에 그려서, 설명이 두 줄이 되면 사진을
+    파고들어 둘째 줄이 잘렸다 (09-26 스탠리 머그 카드가 그랬다). 이제는 소개 문구의
+    아랫변을 사진 바로 위에 맞추고 상품명을 그 위에 올린다. 자리가 모자라면
+    글자 크기를 한 단계씩 줄여서라도 겹치지 않게 한다.
+    """
+    desc_lines, desc_font, desc_h = _fit_desc(one_liner)
+    desc_top = Y_PHOTO - DESC_PHOTO_GAP - desc_h if desc_lines else Y_DESC
+
+    eyebrow_font = B.font("bold", 36)
+    ea, ed = eyebrow_font.getmetrics()
+    name_bottom = min(Y_NAME_BOTTOM, desc_top - NAME_DESC_GAP) if desc_lines else Y_NAME_BOTTOM
+    ceiling = Y_LOGO + logo_height + LOGO_CLEAR + (ea + ed) + EYEBROW_GAP
+
+    name_lines, name_font, name_h = _fit_name(product_name, name_bottom, ceiling)
+    name_top = name_bottom - name_h
+
+    return HeaderLayout(
+        eyebrow_top=name_top - EYEBROW_GAP - (ea + ed),
+        name_lines=name_lines,
+        name_font=name_font,
+        name_top=name_top,
+        desc_lines=desc_lines,
+        desc_font=desc_font,
+        desc_top=desc_top,
+        desc_bottom=desc_top + desc_h,
+    )
+
+
 def render_card(
     data: CardData,
     photo_path: Path,
@@ -211,23 +299,13 @@ def render_card(
         draw.rounded_rectangle([x0, y0, x1, y1], radius=(y1 - y0) // 2, fill=(244, 245, 248))
         draw.text((x0 + pad_x, y0 + pad_y), data.date_label, font=fnt, fill=B.SLATE)
 
-    # 4~5) 눈썹 문구 + 상품명. 상품명 블록의 아랫변을 고정하고 눈썹을 그 위에 붙여서
-    # 1줄이든 2줄이든 헤더 덩어리가 항상 붙어 보이게 한다.
-    name_lines, name_font = fit_lines(
-        data.product_name, lambda s: B.font("extrabold", s), CONTENT_W, 2, [84, 76, 68, 60, 54, 48]
-    )
-    ascent, descent = name_font.getmetrics()
-    name_block_h = len(name_lines) * (ascent + descent) + (len(name_lines) - 1) * 8
-    name_top = Y_NAME_BOTTOM - name_block_h
+    # 4~6) 눈썹 문구 + 상품명 + 한 줄 소개 (아래에서 위로 쌓는다 — plan_header 참고)
+    head = plan_header(data.product_name, data.one_liner, mark.height)
     eyebrow_font = B.font("bold", 36)
-    ea, ed = eyebrow_font.getmetrics()
-    draw_centered(draw, [data.eyebrow], eyebrow_font, W // 2, name_top - (ea + ed) - 18, 0, B.ORANGE)
-    draw_centered(draw, name_lines, name_font, W // 2, name_top, 8, B.INK)
-
-    # 6) 한 줄 소개 (회청색, 최대 2줄)
-    desc_font = B.font("medium", 38)
-    desc_lines = wrap(data.one_liner, desc_font, CONTENT_W)[:2]
-    draw_centered(draw, desc_lines, desc_font, W // 2, Y_DESC, 6, B.SLATE)
+    draw_centered(draw, [data.eyebrow], eyebrow_font, W // 2, head.eyebrow_top, 0, B.ORANGE)
+    draw_centered(draw, head.name_lines, head.name_font, W // 2, head.name_top, 8, B.INK)
+    if head.desc_lines:
+        draw_centered(draw, head.desc_lines, head.desc_font, W // 2, head.desc_top, 6, B.SLATE)
 
     # 7) 상품 사진 — 둥근 모서리, 좌우 여백 균일. 흰 상품이 흰 배경에 묻히지 않게 얇은 테두리.
     photo = _cover(Image.open(photo_path), CONTENT_W, PHOTO_H)
