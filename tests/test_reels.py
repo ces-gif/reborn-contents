@@ -405,3 +405,40 @@ def test_주제곡_경로는_저장소_기준으로_찾는다(tmp_path):
 
     assert pipeline.reel_music_path("assets/music/없는곡.mp3") is None
     assert pipeline.reel_music_path("") is None
+
+
+# ------------------------------------------------- 주제곡 표기 (라이선스 조건)
+
+
+def test_주제곡을_쓴_날은_캡션_끝에_모델을_표기한다():
+    """MiniMax 라이선스가 '쓰는 곳에 이름을 밝혀라' 고 해서 붙인다."""
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("쿠쿠 6인용 밥솥", 89000, 169000)],
+        store_name="리본마켓 평택점",
+        music_credit="MiniMax-Music3",
+    )
+    assert caption.rstrip().endswith("🎵 MiniMax-Music3")
+
+
+def test_주제곡이_없는_날은_표기하지_않는다():
+    """무음인데 캡션에만 음악 표기가 남으면 거짓말이 된다."""
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("쿠쿠 6인용 밥솥", 89000, 169000)], store_name="리본마켓 평택점"
+    )
+    assert "🎵" not in caption
+
+
+def test_표기는_매장_안내_뒤에_온다():
+    from reborn import social
+
+    caption = social.reel_caption(
+        [_product("쿠쿠 6인용 밥솥", 89000, 169000)],
+        store_name="리본마켓 평택점",
+        address="경기 평택시 이충로 49-29 103호 리본마켓",
+        music_credit="MiniMax-Music3",
+    )
+    assert caption.index("📍") < caption.index("🎵")

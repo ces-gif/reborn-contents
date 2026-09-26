@@ -159,6 +159,7 @@ def reel_caption(
     store_name: str,
     address: str = "",
     parking_note: str = "",
+    music_credit: str = "",
 ) -> str:
     """릴스에 붙일 캡션. 영상과 같은 폴더에 나란히 둔다."""
     lines = [_hook(products), f"{store_name}에 오면 반값에 득템 가능해요.", ""]
@@ -180,4 +181,8 @@ def reel_caption(
     lines.append(f"📍 {address}" if address else f"📍 {store_name}")
     if parking_note:
         lines.append(parking_note)
+    # 주제곡 표기. 음악 모델 라이선스가 "쓰는 곳에 이름을 밝혀라" 고 해서 붙인다.
+    # 주제곡이 실제로 깔린 날만 들어간다 (무음인 날 엉뚱하게 표기하지 않는다).
+    if music_credit:
+        lines += ["", f"🎵 {music_credit}"]
     return "\n".join(lines).strip()

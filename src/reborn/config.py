@@ -97,6 +97,7 @@ class Settings:
     reel_seconds_per_card: float
     reel_headline: str
     reel_music: str
+    reel_music_credit: str
     store_address: str
     store_parking_note: str
 
@@ -248,6 +249,10 @@ def _settings_from(data: dict) -> Settings:
         reel_headline=_env("REEL_HEADLINE", instagram.get("reel_headline", "오늘의 추천템")),
         # 릴스에 깔 주제곡 (저장소 기준 상대경로). 파일이 없으면 무음으로 만든다.
         reel_music=_env("REEL_MUSIC", instagram.get("reel_music", "") or ""),
+        # 주제곡을 만든 모델 이름. 라이선스가 표기를 요구해서 릴스 캡션 끝에 붙인다.
+        reel_music_credit=_env(
+            "REEL_MUSIC_CREDIT", instagram.get("reel_music_credit", "") or ""
+        ),
         store_address=_env("STORE_ADDRESS", store.get("address", "") or ""),
         store_parking_note=_env("STORE_PARKING_NOTE", store.get("parking_note", "") or ""),
         raw=data,

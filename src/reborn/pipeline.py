@@ -450,12 +450,17 @@ def run(
         # 릴스 캡션은 영상과 같은 폴더에 나란히 둔다 — 올릴 때 둘을 같이 연다.
         # 피드 캡션(소셜/…-인스타캡션.txt)과 다르다: 릴스는 첫 줄만 보이고
         # 나머지는 접히므로 후킹으로 시작하고 상품을 다 나열하지 않는다.
+        # 음악을 먼저 정한다. 캡션의 표기와 영상의 소리가 어긋나면 안 된다 —
+        # 음원이 없는 날 캡션에만 "🎵 …" 가 남으면 거짓말이 된다.
+        music = reel_music_path(settings.reel_music)
+
         try:
             caption = social.reel_caption(
                 result.published,
                 store_name=settings.store_name,
                 address=settings.store_address,
                 parking_note=settings.store_parking_note,
+                music_credit=settings.reel_music_credit if music else "",
             )
             reel_dir.mkdir(parents=True, exist_ok=True)
             caption_path = reel_dir / f"{day_slug}-릴스캡션.txt"
@@ -472,7 +477,7 @@ def run(
                 frames,
                 reel_dir / f"{day_slug}-릴스.mp4",
                 seconds_per_card=settings.reel_seconds_per_card,
-                music=reel_music_path(settings.reel_music),
+                music=music,
             )
         except Exception as exc:
             # 조용히 넘기지 않는다. 리포트에 남겨야 영상이 왜 없는지 알 수 있다.
