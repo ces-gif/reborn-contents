@@ -169,3 +169,7 @@ stores:
     instagram:
       # 여우마켓 주제곡. assets/music/ 에 파일을 넣으면 그날 릴스부터 깔린다.
       reel_music: "assets/music/fox-theme.mp3"
+      # 이 곡은 scripts/make_jingle.py 로 우리가 직접 합성한 것이라 표기 의무가
+      # 없다. 비워 두면 캡션에 "🎵 …" 가 붙지 않는다 — 안 쓴 모델 이름을
+      # 적어 두면 거짓말이 된다.
+      reel_music_credit: ""
