@@ -14,26 +14,26 @@ def b64(p):
 IMG = {k: b64(LOGO / f'{k}.png') for k in ('molab', 'hrdk', 'goyang', 'kdp')}
 
 TITLE = '2026년 고양시 바이브 코딩 창업경진대회'
-ROWS_PER_PAGE = 16
+ROWS_PER_PAGE = 20
 
 # (파일명, 행사명, 일시, 장소, 쪽수)
 EVENTS = [
-    ('창업특강_참석자명단', '창업 특강 (바이브 코딩 실습)',
-     '2026. 9. 28.(월) 13:00 ~ 15:00', '한국항공대학교 대강당', 5),
+    ('창업특강_참석자명단', '창업 특강',
+     '2026. 9. 28.(월) 14:00 ~ 16:00', '한국항공대학교 대강당', 10),
     ('최종발표_참석자명단', '최종 발표 평가 및 시상',
      '2026. 10. 22.(목)', '한국항공대학교 스타트업 라운지', 3),
 ]
 
 PRIVACY = (
-    '개인정보 수집·이용 안내 ｜ 수집 항목 : 성명, 소속 대학·학과·학년, 연락처, 이메일 ｜ '
+    '개인정보 수집·이용 안내 ｜ 수집 항목 : 성명, 소속, 학년, 연락처, 이메일 ｜ '
     '수집 목적 : 행사 참석 확인, 사업 결과보고 및 정산 ｜ 보유 기간 : 사업 종료 및 정산 완료 후 6개월 이내 파기 ｜ '
     '동의를 거부하실 수 있으나 이 경우 행사 참석 확인이 제한됩니다.'
 )
 
 COLS = [
-    ('연번', '9mm'), ('성 명', '22mm'), ('소속 대학', '38mm'), ('학과', '38mm'),
-    ('학년', '13mm'), ('연락처', '32mm'), ('이메일', '52mm'),
-    ('개인정보<br>동의', '16mm'), ('서 명', '35mm'),
+    ('연번', '11mm'), ('성 명', '26mm'), ('소속', '72mm'), ('학년', '14mm'),
+    ('연락처', '34mm'), ('이메일', '56mm'),
+    ('개인정보<br>동의', '17mm'), ('서 명', '38mm'),
 ]
 
 CSS = f'''
@@ -48,27 +48,27 @@ body{{font-family:'NS',sans-serif;color:#111;-webkit-print-color-adjust:exact;pr
 .pg>*{{flex:0 0 auto}}
 
 .doc{{font-size:3mm;color:#666;text-align:right;margin-bottom:1.5mm}}
-h1{{font-size:6.4mm;text-align:center;letter-spacing:.6mm;margin-bottom:1mm}}
-.sub{{font-size:3.4mm;text-align:center;color:#444;margin-bottom:3mm}}
+h1{{font-size:6mm;text-align:center;letter-spacing:.6mm;margin-bottom:.8mm}}
+.sub{{font-size:3.2mm;text-align:center;color:#444;margin-bottom:2.4mm}}
 
-.meta{{width:100%;border-collapse:collapse;margin-bottom:2.4mm}}
-.meta td{{border:.25mm solid #888;font-size:3.2mm;padding:1.3mm 2.5mm}}
+.meta{{width:100%;border-collapse:collapse;margin-bottom:2mm}}
+.meta td{{border:.25mm solid #888;font-size:3.1mm;padding:1.1mm 2.5mm}}
 .meta td.k{{background:#EFEFEF;font-weight:700;text-align:center;width:22mm}}
 
 table.sign{{width:100%;border-collapse:collapse;table-layout:fixed}}
 table.sign th{{background:#EFEFEF;border:.25mm solid #666;font-size:3.1mm;
- padding:1.4mm 1mm;line-height:1.2}}
-table.sign td{{border:.25mm solid #999;height:7.6mm;font-size:3.2mm;padding:0 2mm}}
+ padding:1.1mm 1mm;line-height:1.2}}
+table.sign td{{border:.25mm solid #999;height:6.5mm;font-size:3.1mm;padding:0 2mm}}
 td.n{{text-align:center;color:#666}}
 td.c{{text-align:center}}
 
-.foot{{margin-top:2.4mm;display:flex;justify-content:space-between;align-items:flex-end;gap:8mm}}
-.pv{{font-size:2.65mm;color:#555;line-height:1.5;flex:1}}
+.foot{{margin-top:2mm;display:flex;justify-content:space-between;align-items:flex-end;gap:8mm}}
+.pv{{font-size:2.6mm;color:#555;line-height:1.45;flex:1}}
 .sum{{border-collapse:collapse;flex:0 0 auto}}
 .sum td{{border:.25mm solid #888;font-size:3.05mm;padding:1.2mm 3mm;text-align:center}}
 .sum td.k{{background:#EFEFEF;font-weight:700}}
 
-.bar{{margin-top:auto;padding-top:2.4mm;border-top:.25mm solid #CCC;
+.bar{{margin-top:auto;padding-top:2mm;border-top:.25mm solid #CCC;
  display:flex;align-items:center;justify-content:center;gap:5mm}}
 .lbl{{font-size:2.7mm;font-weight:700;color:#555;background:#F0F0F0;border-radius:.8mm;
  padding:.8mm 2mm}}
@@ -82,7 +82,7 @@ def page(ev, when, place, pno, total):
     body = ''
     for i in range(ROWS_PER_PAGE):
         n = (pno - 1) * ROWS_PER_PAGE + i + 1
-        body += (f'<tr><td class="n">{n}</td>' + '<td></td>' * 6 +
+        body += (f'<tr><td class="n">{n}</td>' + '<td></td>' * 5 +
                  '<td class="c">□</td><td></td></tr>')
     return f'''<div class="pg">
  <div class="doc">{pno} / {total} 쪽</div>
@@ -92,7 +92,7 @@ def page(ev, when, place, pno, total):
   <tr><td class="k">행사명</td><td>{ev}</td>
       <td class="k">일 시</td><td style="width:62mm">{when}</td></tr>
   <tr><td class="k">장 소</td><td>{place}</td>
-      <td class="k">주관 · 운영</td><td>고양산업진흥원 · (주)리본마켓</td></tr>
+      <td class="k">주 관</td><td>고양산업진흥원</td></tr>
  </table>
  <table class="sign"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>
  <div class="foot">
