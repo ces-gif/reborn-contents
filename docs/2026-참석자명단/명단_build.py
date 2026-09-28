@@ -25,15 +25,14 @@ EVENTS = [
 ]
 
 PRIVACY = (
-    '개인정보 수집·이용 안내 ｜ 수집 항목 : 성명, 소속, 학년, 연락처, 이메일 ｜ '
+    '개인정보 수집·이용 안내 ｜ 수집 항목 : 성명, 소속, 학년 ｜ '
     '수집 목적 : 행사 참석 확인, 사업 결과보고 및 정산 ｜ 보유 기간 : 사업 종료 및 정산 완료 후 6개월 이내 파기 ｜ '
     '동의를 거부하실 수 있으나 이 경우 행사 참석 확인이 제한됩니다.'
 )
 
 COLS = [
-    ('연번', '11mm'), ('성 명', '26mm'), ('소속', '72mm'), ('학년', '14mm'),
-    ('연락처', '34mm'), ('이메일', '56mm'),
-    ('개인정보<br>동의', '17mm'), ('서 명', '38mm'),
+    ('연번', '15mm'), ('성 명', '45mm'), ('소속', '105mm'), ('학년', '24mm'),
+    ('개인정보<br>동의', '26mm'), ('서 명', '58mm'),
 ]
 
 CSS = f'''
@@ -62,11 +61,8 @@ table.sign td{{border:.25mm solid #999;height:6.5mm;font-size:3.1mm;padding:0 2m
 td.n{{text-align:center;color:#666}}
 td.c{{text-align:center}}
 
-.foot{{margin-top:2mm;display:flex;justify-content:space-between;align-items:flex-end;gap:8mm}}
-.pv{{font-size:2.6mm;color:#555;line-height:1.45;flex:1}}
-.sum{{border-collapse:collapse;flex:0 0 auto}}
-.sum td{{border:.25mm solid #888;font-size:3.05mm;padding:1.2mm 3mm;text-align:center}}
-.sum td.k{{background:#EFEFEF;font-weight:700}}
+.foot{{margin-top:2.4mm}}
+.pv{{font-size:2.7mm;color:#555;line-height:1.5}}
 
 .bar{{margin-top:auto;padding-top:2mm;border-top:.25mm solid #CCC;
  display:flex;align-items:center;justify-content:center;gap:5mm}}
@@ -82,7 +78,7 @@ def page(ev, when, place, pno, total):
     body = ''
     for i in range(ROWS_PER_PAGE):
         n = (pno - 1) * ROWS_PER_PAGE + i + 1
-        body += (f'<tr><td class="n">{n}</td>' + '<td></td>' * 5 +
+        body += (f'<tr><td class="n">{n}</td>' + '<td></td>' * 3 +
                  '<td class="c">□</td><td></td></tr>')
     return f'''<div class="pg">
  <div class="doc">{pno} / {total} 쪽</div>
@@ -95,13 +91,7 @@ def page(ev, when, place, pno, total):
       <td class="k">주 관</td><td>고양산업진흥원</td></tr>
  </table>
  <table class="sign"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>
- <div class="foot">
-  <div class="pv">※ {PRIVACY}</div>
-  <table class="sum">
-   <tr><td class="k">이 쪽 참석 인원</td><td style="width:32mm">　　　　명</td></tr>
-   <tr><td class="k">작성자 확인</td><td style="white-space:nowrap">　　　　(인)</td></tr>
-  </table>
- </div>
+ <div class="foot"><div class="pv">※ {PRIVACY}</div></div>
  <div class="bar">
   <span class="lbl">주최</span>
   <span class="logos"><img class="l-molab" src="{IMG['molab']}"><img class="l-hrdk" src="{IMG['hrdk']}"></span>
