@@ -1,0 +1,854 @@
+<!DOCTYPE html><html class="light" lang="ko" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_standard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300..900;1,300..900&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;background-color:#ffffff;color:#1e293b;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}
+@keyframes scan-radar {
+  0% { transform: translateY(-100%); opacity: 0; }
+  50% { opacity: 0.6; }
+  100% { transform: translateY(1000%); opacity: 0; }
+}
+@keyframes holo-glow {
+  0%, 100% { filter: drop-shadow(0 0 16px rgba(79, 70, 229, 0.4)) drop-shadow(0 0 30px rgba(0, 168, 120, 0.2)); }
+  50% { filter: drop-shadow(0 0 24px rgba(99, 102, 241, 0.6)) drop-shadow(0 0 45px rgba(0, 168, 120, 0.35)); }
+}
+@keyframes ring-spin-slow {
+  0% { transform: translate(-50%, -50%) rotateX(72deg) rotateZ(0deg); }
+  100% { transform: translate(-50%, -50%) rotateX(72deg) rotateZ(360deg); }
+}
+@keyframes ring-spin-reverse {
+  0% { transform: translate(-50%, -50%) rotateX(72deg) rotateZ(360deg); }
+  100% { transform: translate(-50%, -50%) rotateX(72deg) rotateZ(0deg); }
+}
+@keyframes figure-rotate-smooth {
+  0% { transform: rotateY(-18deg); }
+  50% { transform: rotateY(18deg); }
+  100% { transform: rotateY(-18deg); }
+}
+.human-3d-stage {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+.human-rotating-core {
+  transform-style: preserve-3d;
+  animation: figure-rotate-smooth 12s ease-in-out infinite, holo-glow 6s ease-in-out infinite;
+}
+.animate-ring-slow {
+  animation: ring-spin-slow 20s linear infinite;
+}
+.animate-ring-rev {
+  animation: ring-spin-reverse 15s linear infinite;
+}
+.animate-scan-line {
+  animation: scan-radar 4.5s ease-in-out infinite;
+}
+</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"primary":"#FFD400","primary-hover":"#F5C400","category-instrument":"#D97706","category-laparo":"#00A878","category-arthro":"#4F46E5","surface":"#FFFFFF","surface-subtle":"#F8FAFC","surface-raised":"#F1F5F9","line":"#E2E8F0","line-strong":"#CBD5E1","on-surface":"#0F172A","on-surface-muted":"#475569","on-surface-subtle":"#64748B"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"fontFamily":{"display-xl":["Space Grotesk"],"headline-lg":["Space Grotesk"],"headline-lg-thin":["Space Grotesk"],"headline-md":["Space Grotesk"],"title-lg":["Hanken Grotesk"],"title-md":["Hanken Grotesk"],"body-lg":["Hanken Grotesk"],"body-md":["Hanken Grotesk"],"body-sm":["Hanken Grotesk"],"label-md":["Space Grotesk"],"label-sm":["Space Grotesk"],"spec-number":["Space Grotesk"],"spec-unit":["Space Grotesk"]}}}};</script></head><body class="bg-[#ffffff] font-body-md text-on-surface antialiased selection:bg-[#FFD400] selection:text-[#000000]"><header class="fixed top-0 left-0 right-0 z-50 bg-[#ffffff]/90 backdrop-blur-md border-b border-line shadow-[0_1px_3px_rgba(0,0,0,0.03)]"><div class="h-[72px] max-w-[1440px] mx-auto px-6 lg:px-12 flex items-center justify-between"><div class="flex items-center gap-8"><a class="flex items-center gap-3 group focus:outline-none" data-path="home" href="#"><img alt="SUMEX SURGICAL OPTICS" class="h-8 md:h-9 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUvgbFOCZarXcmVtx9MNfOvqMw_M_NpOsyEYfBzazwkqpv4Exk-2cdUnF7JU55hNkLE-vqHUmFWIZ7AUUKAxpu-oOuUBqxJT0cII6Y5Zdf8laEBAGU9kFWb-XXxJ5pcAMeacrmeWL58LgbhMhjN9prgErb7FCFU5bILlH2P8EriCv-8nWzx2bGHbwjt005KUBvPuijYD4o9zc_KVL2m45z7guLHHrE3-yesCSvh1NsuvVkOqoo6KoEtwH4AcuBUKynGOU"></a></div><nav class="hidden xl:flex items-center gap-7"><a class="font-label-md text-on-surface-muted hover:text-on-surface transition-colors py-2 font-semibold" data-path="about" href="#about">회사소개</a><a class="font-label-md text-on-surface-muted hover:text-on-surface transition-colors py-2 font-semibold" data-path="ai-search" href="#ai-search">AI 제품검색</a><a class="font-label-md text-on-surface-muted hover:text-on-surface transition-colors py-2 font-semibold" data-path="anatomy-finder" href="#anatomy-finder">신체 부위별 제품</a><div class="relative group flex items-center"><a class="font-label-md text-on-surface-muted group-hover:text-on-surface transition-colors py-2 flex items-center gap-1 font-semibold" data-path="products" href="#platform-1788"><span class="">제품 카테고리</span><span class="material-symbols-outlined text-[16px] text-on-surface-subtle group-hover:text-on-surface transition-transform group-hover:rotate-180">expand_more</span></a><div class="absolute top-full left-0 hidden group-hover:flex flex-col bg-white border border-line rounded p-2 min-w-[210px] shadow-xl backdrop-blur-md z-50"><a class="px-3 py-2 text-[13px] text-on-surface-muted hover:text-category-instrument hover:bg-surface-raised rounded flex items-center justify-between transition-colors font-medium" href="#platform-1788"><span class="flex items-center gap-2">1788 4K Platform</span><span class="w-1.5 h-1.5 rounded-full bg-[#FFD400]"></span></a><a class="px-3 py-2 text-[13px] text-on-surface-muted hover:text-category-arthro hover:bg-surface-raised rounded flex items-center justify-between transition-colors font-medium" href="#core-divisions"><span class="flex items-center gap-2">ARTHRO 관절경</span><span class="w-1.5 h-1.5 rounded-full bg-category-arthro"></span></a><a class="px-3 py-2 text-[13px] text-on-surface-muted hover:text-category-laparo hover:bg-surface-raised rounded flex items-center justify-between transition-colors font-medium" href="#core-divisions"><span class="flex items-center gap-2">LAPARO 복강경</span><span class="w-1.5 h-1.5 rounded-full bg-category-laparo"></span></a><a class="px-3 py-2 text-[13px] text-on-surface-muted hover:text-category-instrument hover:bg-surface-raised rounded flex items-center justify-between transition-colors font-medium" href="#core-divisions"><span class="flex items-center gap-2">INSTRUMENT 파워툴</span><span class="w-1.5 h-1.5 rounded-full bg-category-instrument"></span></a></div></div><a class="font-label-md text-on-surface-muted hover:text-on-surface transition-colors py-2 font-semibold" data-path="newsletter" href="#newsletter">뉴스레터</a><a class="font-label-md text-on-surface-muted hover:text-on-surface transition-colors py-2 font-semibold" data-path="inquiry" href="#inquiry">고객문의</a></nav><div class="flex items-center gap-3"><a class="w-10 h-10 rounded bg-white border border-line hover:border-line-strong flex items-center justify-center text-on-surface-subtle hover:text-on-surface shadow-sm transition-all" href="#" target="_blank" title="카카오톡 오픈채팅"><span class="material-symbols-outlined text-[20px]">chat</span></a><a class="h-[42px] px-5 bg-[#FFD400] hover:bg-primary-hover text-[#000000] font-label-md font-bold tracking-wider uppercase rounded-[2px] transition-all flex items-center gap-2 shadow-sm hover:shadow" data-path="inquiry" href="#inquiry"><span class="">문의하기</span><span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div></div></header><main class="w-full pt-[72px] bg-[#ffffff]"><div class="flex flex-col w-full text-on-surface select-none">
+<section class="relative w-full flex flex-col justify-between overflow-hidden px-6 lg:px-12 pt-10 pb-16 bg-gradient-to-b from-white via-surface-subtle to-white" id="about">
+<div class="absolute inset-0 pointer-events-none opacity-40" style="background-image: radial-gradient(circle, rgba(15,23,42,0.12) 1px, transparent 1px); background-size: 64px 64px;"></div>
+<div class="absolute top-12 left-12 text-on-surface-subtle font-label-sm tracking-[0.2em] pointer-events-none hidden md:block">+ 37.4789° N / 127.1264° E</div>
+<div class="absolute top-12 right-12 text-on-surface-subtle font-label-sm tracking-[0.2em] pointer-events-none hidden md:block">+ SYS_REF_1788_KOR</div>
+<div class="relative z-10 max-w-[1440px] w-full mx-auto flex flex-wrap items-center justify-between gap-4 pt-2 pb-6 border-b border-line">
+<div class="flex items-center gap-3">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-amber-50 border border-amber-200 font-label-sm text-category-instrument font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-category-instrument animate-ping"></span>
+          STRYKER AUTHORIZED DISTRIBUTOR
+        </span>
+<span class="font-label-sm text-on-surface-subtle tracking-widest hidden sm:inline">SYS_REF: N 37.47° E 127.12°</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-category-arthro font-label-sm border border-indigo-200 font-semibold">OS 정형외과</span>
+<span class="px-2.5 py-0.5 rounded-full bg-amber-50 text-category-instrument font-label-sm border border-amber-200 font-semibold">NS 신경외과</span>
+<span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-category-laparo font-label-sm border border-emerald-200 font-semibold">GS 일반외과</span>
+</div>
+</div>
+<div class="relative z-10 max-w-[1440px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center my-auto py-12">
+<div class="lg:col-span-7 flex flex-col justify-center space-y-8">
+<div class="space-y-1">
+<div class="flex items-center gap-3 mb-4">
+<span class="h-[2px] w-8 bg-category-instrument"></span>
+<span class="font-label-md text-category-instrument tracking-widest uppercase font-bold">Precision Surgical Optics</span>
+</div>
+<h1 class="flex flex-col text-left tracking-tighter leading-none">
+<span class="font-headline-lg lg:text-[104px] lg:leading-[96px] font-black text-on-surface tracking-[-0.04em]">No Gray,</span>
+<span class="font-headline-lg lg:text-[104px] lg:leading-[96px] font-light text-slate-400 tracking-[-0.03em]">Only Great.</span>
+</h1>
+</div>
+<p class="font-body-lg text-on-surface-muted max-w-xl font-normal leading-relaxed text-[17px]">
+          정형외과 · 신경외과 · 일반외과 수술실을 위한 Stryker 솔루션 파트너, <strong class="text-on-surface font-bold">수멕스(SUMEX)</strong>.<br>
+          0.001mm의 시각적 오차도 허용하지 않는 무결점 수술 비전 플랫폼을 공급합니다.
+        </p>
+<div class="flex flex-wrap items-center gap-4 pt-2">
+<a class="group h-[52px] px-8 bg-[#FFD400] hover:bg-primary-hover text-[#000000] font-label-md font-bold tracking-widest uppercase rounded-[2px] transition-all flex items-center gap-3 shadow-sm hover:shadow" href="#inquiry">
+<span class="">데모 및 도입 문의</span>
+<span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</a>
+<a class="h-[52px] px-8 bg-white hover:bg-surface-raised text-on-surface border border-line hover:border-line-strong font-label-md tracking-wider rounded-[2px] transition-all flex items-center gap-2 shadow-sm" href="#platform-1788">
+<span class="">1788 플랫폼 살펴보기</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-subtle">north_east</span>
+</a>
+</div>
+<div class="grid grid-cols-3 gap-4 pt-6 border-t border-line max-w-lg">
+<div>
+<div class="font-label-sm text-on-surface-subtle uppercase">CALIBRATION</div>
+<div class="font-headline-md text-[20px] text-on-surface font-mono font-bold mt-0.5">0.00ms</div>
+<div class="text-[11px] text-category-laparo font-medium">Zero Latency Sync</div>
+</div>
+<div>
+<div class="font-label-sm text-on-surface-subtle uppercase">CONTRAST DEPTH</div>
+<div class="font-headline-md text-[20px] text-on-surface font-mono font-bold mt-0.5">1,000,000:1</div>
+<div class="text-[11px] text-on-surface-muted">Pure OLED Matrix</div>
+</div>
+<div>
+<div class="font-label-sm text-on-surface-subtle uppercase">FLUORESCENCE</div>
+<div class="font-headline-md text-[20px] text-category-instrument font-mono font-bold mt-0.5">4-MODE</div>
+<div class="text-[11px] text-on-surface-muted">AIM Technology</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-5 relative flex items-center justify-center">
+<div class="absolute w-[360px] h-[360px] rounded-full bg-gradient-to-tr from-emerald-100 via-amber-100 to-indigo-100 blur-[80px] pointer-events-none opacity-80"></div>
+<div class="relative w-full max-w-[460px] bg-white rounded-[4px] border border-line p-6 shadow-xl backdrop-blur-sm">
+<div class="absolute -top-1.5 -left-1.5 w-3 h-3 border-t-2 border-l-2 border-category-instrument"></div>
+<div class="absolute -top-1.5 -right-1.5 w-3 h-3 border-t-2 border-r-2 border-category-instrument"></div>
+<div class="absolute -bottom-1.5 -left-1.5 w-3 h-3 border-b-2 border-l-2 border-category-instrument"></div>
+<div class="absolute -bottom-1.5 -right-1.5 w-3 h-3 border-b-2 border-r-2 border-category-instrument"></div>
+<div class="flex items-center justify-between pb-3 mb-4 border-b border-line font-label-sm">
+<span class="text-on-surface-muted flex items-center gap-1.5 font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-category-laparo"></span>
+              PORT_01 // 4K SURGICAL FEED
+            </span>
+<span class="text-category-instrument font-mono font-bold">60.00 FPS</span>
+</div>
+<div class="relative w-full aspect-[4/5] rounded overflow-hidden bg-slate-950 border border-slate-900 group shadow-inner"><img alt="Stryker 1788 4K surgical camera tower endoscopy video cart system" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida/AEtjO1UEBCCGvQV8wt08A7K9YAVJJoTQWFb6v_LgHG3z2L4yt2elBEGYVcJLsUjjr_bITFYd8c8bGbfl-v7RlnZcAI2Hquljhhpe4zxShsbKaDcjNaDLTmJUW_zFt2xoR-U3qZdBvlOuXuL4alwru8MNpWxW0X9zxD9PtcUvNTvkPH6yDa12An_A_c505FWD5pJkFOK0CT4CSko8q2R0TbG3-lIAYdvkSTQx-tQBlENb56PaZ8wt_LYDEtG-RBo2"></div>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full bg-white border-y border-line py-5 px-6 lg:px-12" id="trust-bar">
+<div class="max-w-[1440px] mx-auto grid grid-cols-2 md:grid-cols-5 gap-6 items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-category-instrument text-[26px]">verified</span>
+<div>
+<div class="font-label-md text-on-surface leading-tight font-bold">Stryker 공식 대리점</div>
+<div class="text-[11px] text-on-surface-subtle">Authorized Sales &amp; Tech</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-category-arthro text-[26px]">orthopedics</span>
+<div>
+<div class="font-label-md text-on-surface leading-tight font-bold">OS 정형외과</div>
+<div class="text-[11px] text-on-surface-subtle">Arthro &amp; Small Joint Spec</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-category-instrument text-[26px]">neurology</span>
+<div>
+<div class="font-label-md text-on-surface leading-tight font-bold">NS 신경외과</div>
+<div class="text-[11px] text-on-surface-subtle">Cranial &amp; Spine Drill Core</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-category-laparo text-[26px]">medication</span>
+<div>
+<div class="font-label-md text-on-surface leading-tight font-bold">GS 일반외과</div>
+<div class="text-[11px] text-on-surface-subtle">4K Laparo &amp; Fluorescence</div>
+</div>
+</div>
+<div class="col-span-2 md:col-span-1 flex items-center justify-end gap-2 text-right">
+<div class="w-2 h-2 rounded-full bg-category-laparo animate-pulse"></div>
+<span class="font-label-sm text-category-laparo font-bold tracking-wider">100% 제조사 인증 정품</span>
+</div>
+</div>
+</section>
+<section class="w-full py-24 px-6 lg:px-12 bg-white border-b border-line" id="ai-search">
+<div class="max-w-[1040px] mx-auto text-center space-y-8">
+<div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded bg-indigo-50 border border-indigo-200 font-label-sm text-category-arthro font-bold">
+<span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+        SUMEX AI SURGICAL QUERY ENGINE
+      </div>
+<div class="space-y-3">
+<h2 class="font-headline-lg text-on-surface font-bold">원하는 수술 장비를 AI로 즉시 검색하세요</h2>
+<p class="font-body-md text-on-surface-muted max-w-xl mx-auto">
+          수술 술기명, 해부학적 적응증, 혹은 특정 카탈로그 번호를 자연어로 입력하시면 최적 조합 장비와 공식 규격을 추천합니다.
+        </p>
+</div>
+<div class="relative w-full">
+<div class="h-[72px] w-full rounded bg-white border-2 border-line hover:border-slate-400 focus-within:border-category-instrument focus-within:shadow-[0_0_24px_rgba(217,119,6,0.15)] transition-all flex items-center px-6 gap-4 shadow-sm">
+<span class="material-symbols-outlined text-[24px] text-on-surface-subtle">search</span>
+<input class="w-full bg-transparent text-on-surface placeholder:text-on-surface-subtle text-[16px] focus:outline-none font-body-md font-medium" placeholder="어떤 수술에 필요한 장비를 찾으세요? 예) 무릎 관절경에 쓰는 4K 카메라 및 셰이버" type="text">
+<button class="h-[46px] px-6 bg-[#FFD400] hover:bg-primary-hover text-[#000000] font-label-md font-bold uppercase rounded-[2px] whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm">
+<span class="">검색</span>
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+</button>
+</div>
+</div>
+<div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+<span class="font-label-sm text-on-surface-subtle mr-2 font-semibold">인기 검색 프롬프트:</span>
+<button class="px-3 py-1.5 rounded-full bg-surface-subtle border border-line hover:border-category-laparo text-on-surface-muted hover:text-category-laparo text-[12px] font-mono transition-all font-medium">
+          # 복강경 형광 영상 장비
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-subtle border border-line hover:border-category-instrument text-on-surface-muted hover:text-category-instrument text-[12px] font-mono transition-all font-medium">
+          # 척추 수술용 고속 드릴 Signature
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-subtle border border-line hover:border-category-arthro text-on-surface-muted hover:text-category-arthro text-[12px] font-mono transition-all font-medium">
+          # 어깨 회전근개 봉합 앵커 ICONIX
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-subtle border border-line hover:border-on-surface text-on-surface-muted hover:text-on-surface text-[12px] font-mono transition-all font-medium">
+          # 수술 연기 배출 기복기 PneumoClear
+        </button>
+</div>
+</div>
+</section>
+<section class="relative w-full py-28 px-6 lg:px-12 bg-white border-b border-line" id="anatomy-finder">
+<div class="max-w-[1440px] mx-auto space-y-12">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-line">
+<div>
+<div class="flex items-center gap-2 mb-3">
+<span class="w-2 h-2 bg-category-arthro rounded-full"></span>
+<span class="font-label-sm text-category-arthro font-bold tracking-[0.2em] uppercase">Interactive Anatomy Matrix</span>
+</div>
+<h2 class="tracking-tight">
+<span class="font-headline-lg font-bold text-on-surface block sm:inline">어디를 수술하시나요?</span>
+<span class="font-headline-lg font-light text-slate-400 block sm:inline sm:ml-4">부위를 선택하시면 최적화된 수술 장비 솔루션을 안내합니다</span>
+</h2>
+</div>
+<a class="inline-flex items-center gap-2 font-label-md text-category-instrument hover:underline font-bold" href="#inquiry">
+<span class="">인체 부위별 전체 장비 목록</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+<div class="lg:col-span-7 relative min-h-[640px] xl:min-h-[660px] rounded bg-slate-950 border border-slate-800 overflow-hidden flex flex-col justify-between p-6 shadow-xl group">
+<div class="absolute top-2.5 left-2.5 w-3.5 h-3.5 border-t-2 border-l-2 border-indigo-400/80 z-20 pointer-events-none"></div>
+<div class="absolute top-2.5 right-2.5 w-3.5 h-3.5 border-t-2 border-r-2 border-indigo-400/80 z-20 pointer-events-none"></div>
+<div class="absolute bottom-2.5 left-2.5 w-3.5 h-3.5 border-b-2 border-l-2 border-indigo-400/80 z-20 pointer-events-none"></div>
+<div class="absolute bottom-2.5 right-2.5 w-3.5 h-3.5 border-b-2 border-r-2 border-indigo-400/80 z-20 pointer-events-none"></div>
+<div class="relative z-20 flex items-center justify-between pb-3 border-b border-slate-800 font-mono text-[11px] text-slate-400">
+<div class="flex items-center gap-2.5">
+<span class="relative flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+</span>
+<span class="text-white font-bold tracking-wider">3D ANATOMICAL ROTATION ACTIVE</span>
+<span class="hidden sm:inline text-slate-500">|</span>
+<span class="hidden sm:inline text-indigo-400 font-semibold">AXIS: Y-ROTATION 360°</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-slate-300 font-semibold">FOV: 84.6° // 3D WIREFRAME MESH</span>
+<span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-amber-400 font-bold">READY</span>
+</div>
+</div>
+<div class="relative flex-1 flex items-center justify-center my-4 overflow-hidden human-3d-stage">
+<div class="absolute inset-0 pointer-events-none opacity-25" style="background-image: linear-gradient(to right, #4f46e5 1px, transparent 1px), linear-gradient(to bottom, #4f46e5 1px, transparent 1px); background-size: 40px 40px;"></div>
+<div class="absolute w-[380px] h-[380px] rounded-full bg-gradient-to-tr from-indigo-950 via-indigo-900/40 to-emerald-950/30 blur-[90px] pointer-events-none"></div>
+<div class="absolute top-1/2 left-1/2 w-[340px] h-[340px] rounded-full border border-indigo-500/30 border-dashed animate-ring-slow pointer-events-none"></div>
+<div class="absolute top-1/2 left-1/2 w-[420px] h-[420px] rounded-full border border-emerald-400/25 border-dotted animate-ring-rev pointer-events-none"></div>
+<div class="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#38bdf8] pointer-events-none animate-scan-line z-10"></div>
+<div class="relative z-10 w-full h-full max-h-[500px] flex items-center justify-center human-rotating-core">
+<div class="relative h-full flex items-center justify-center">
+<img class="h-full w-auto max-h-[460px] object-contain select-none pointer-events-none" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMIq_qibdXbZCi9ovm7D0Z2GCuwVRYq30UkWqE0sNxeKp4LugtyrIb1YP19Bbk60DIgvOviu4fYYwCLpW5LTaGYkudO5NSqwo8s21GlxF3FtGXjYkMkF_C6REkzyWB--dHMwXwYnJaDgGA0tqtnU1WdYYXEJ1kZbp7c4OZN0nnpIZ0CXOHkw3TtPg8YFuxPE9w1CZ7QUIWcTBLPfpWLX7h_XgdRZOFEEv4EDUWsn2bTRA5TT1ddBzU3w">
+<button class="absolute top-[31%] left-[32%] group cursor-pointer focus:outline-none z-30 transition-transform hover:scale-110" id="pin-shoulder" title="어깨 SHOULDER">
+<span class="relative flex h-5 w-5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-5 w-5 bg-indigo-500 border-2 border-white shadow-[0_0_10px_#6366f1]"></span>
+</span>
+<span class="absolute left-6 -top-1 px-2.5 py-0.5 rounded bg-slate-900/90 backdrop-blur-sm border border-indigo-400 text-[11px] font-mono text-indigo-300 whitespace-nowrap font-bold shadow-lg">
+        SHOULDER (어깨)
+      </span>
+</button>
+<button class="absolute top-[69%] left-[40%] group cursor-pointer focus:outline-none z-30 transition-transform hover:scale-110" id="pin-knee" title="무릎 KNEE">
+<span class="relative flex h-4 w-4">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-50"></span>
+<span class="relative inline-flex rounded-full h-4 w-4 bg-indigo-500 border-2 border-white shadow"></span>
+</span>
+<span class="absolute left-5 -top-1 px-2.5 py-0.5 rounded bg-slate-900/90 backdrop-blur-sm border border-slate-700 hover:border-indigo-400 text-[11px] font-mono text-slate-300 hover:text-indigo-300 whitespace-nowrap font-bold shadow-lg">
+        KNEE (무릎)
+      </span>
+</button>
+<button class="absolute top-[46%] left-[49%] -translate-x-1/2 group cursor-pointer focus:outline-none z-30 transition-transform hover:scale-110" id="pin-abdomen" title="복부 ABDOMEN">
+<span class="relative flex h-4 w-4">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50"></span>
+<span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white shadow"></span>
+</span>
+<span class="absolute left-5 -top-1 px-2.5 py-0.5 rounded bg-slate-900/90 backdrop-blur-sm border border-slate-700 hover:border-emerald-400 text-[11px] font-mono text-slate-300 hover:text-emerald-300 whitespace-nowrap font-bold shadow-lg">
+        ABDOMEN (복강)
+      </span>
+</button>
+<button class="absolute top-[39%] left-[58%] group cursor-pointer focus:outline-none z-30 transition-transform hover:scale-110" id="pin-spine" title="척추 SPINE">
+<span class="relative flex h-4 w-4">
+<span class="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white shadow"></span>
+</span>
+<span class="absolute left-5 -top-1 px-2.5 py-0.5 rounded bg-slate-900/90 backdrop-blur-sm border border-slate-700 hover:border-amber-400 text-[11px] font-mono text-slate-300 hover:text-amber-300 whitespace-nowrap font-bold shadow-lg">
+        SPINE (척추)
+      </span>
+</button>
+<button class="absolute top-[14%] left-[49%] -translate-x-1/2 group cursor-pointer focus:outline-none z-30 transition-transform hover:scale-110" id="pin-brain" title="뇌 BRAIN">
+<span class="relative flex h-4 w-4">
+<span class="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white shadow"></span>
+</span>
+<span class="absolute left-5 -top-1 px-2.5 py-0.5 rounded bg-slate-900/90 backdrop-blur-sm border border-slate-700 hover:border-amber-400 text-[11px] font-mono text-slate-300 hover:text-amber-300 whitespace-nowrap font-bold shadow-lg">
+        BRAIN (두개/뇌)
+      </span>
+</button>
+<button class="absolute top-[54%] left-[23%] group cursor-pointer focus:outline-none z-30 transition-transform hover:scale-110" id="pin-smalljoint" title="손/발 SMALL JOINT">
+<span class="relative flex h-4 w-4">
+<span class="relative inline-flex rounded-full h-4 w-4 bg-slate-400 border-2 border-white shadow"></span>
+</span>
+<span class="absolute right-5 -top-1 px-2.5 py-0.5 rounded bg-slate-900/90 backdrop-blur-sm border border-slate-700 hover:border-indigo-400 text-[11px] font-mono text-slate-300 whitespace-nowrap font-bold shadow-lg">
+        SMALL JOINT (수부/족부)
+      </span>
+</button>
+</div>
+</div>
+</div>
+<div class="relative z-20 pt-3 border-t border-slate-800 flex items-center justify-between font-mono text-[11px] text-slate-400">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+<span class="">ISO 13485 ANATOMICAL CAD MAPPING VERIFIED</span>
+</div>
+<div class="text-right text-slate-500 hidden sm:block">
+            X: 348.9 // Y: 712.4 // Z: 0.00 | MODEL_ID: ANAT_1788
+          </div>
+</div>
+</div>
+<div class="lg:col-span-5 flex flex-col justify-between min-h-[640px] xl:min-h-[660px] bg-surface-subtle p-7 lg:p-8 rounded-[4px] border border-line shadow-sm">
+<div>
+<div class="flex items-center justify-between pb-4 border-b border-line">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-category-arthro" id="part-indicator-dot"></span>
+<span class="px-2.5 py-1 rounded bg-indigo-50 text-category-arthro font-label-sm border border-indigo-200 font-bold" id="part-category-tag">
+                ARTHROSCOPY SUITE
+              </span>
+</div>
+<span class="font-mono text-on-surface-subtle text-[11px] font-semibold" id="part-id-tag">LOC: OS_ANAT_01</span>
+</div>
+<div class="grid grid-cols-4 gap-1.5 my-4 p-1 bg-white border border-line rounded" id="part-quick-tabs">
+<button class="py-1.5 px-2 text-[12px] font-mono rounded font-bold transition-all text-category-arthro bg-indigo-50 border border-indigo-200" id="tab-shoulder">어깨 Shoulder</button>
+<button class="py-1.5 px-2 text-[12px] font-mono rounded font-medium transition-all text-on-surface-muted hover:text-on-surface hover:bg-surface-raised" id="tab-knee">무릎 Knee</button>
+<button class="py-1.5 px-2 text-[12px] font-mono rounded font-medium transition-all text-on-surface-muted hover:text-on-surface hover:bg-surface-raised" id="tab-spine">척추 Spine</button>
+<button class="py-1.5 px-2 text-[12px] font-mono rounded font-medium transition-all text-on-surface-muted hover:text-on-surface hover:bg-surface-raised" id="tab-abdomen">복강 Abdomen</button>
+</div>
+<div class="pt-2">
+<h3 class="font-headline-md text-[30px] lg:text-[32px] text-on-surface font-bold tracking-tight" id="part-title">어깨 SHOULDER</h3>
+<p class="font-body-sm text-on-surface-muted mt-2 leading-relaxed" id="part-desc">
+                회전근개(Rotator Cuff) 파열 복원술 및 관절와순(Labrum) 봉합을 위한 초정밀 4K 관절경 &amp; 고주파 RF 절제 솔루션.
+              </p>
+</div>
+<div class="mt-6 space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-on-surface-subtle uppercase tracking-wider font-bold">권장 수술 장비 세트 (RECOMMENDED STACK)</span>
+<span class="font-mono text-[10px] text-category-laparo font-semibold">3 UNITS VERIFIED</span>
+</div>
+<div class="p-3.5 rounded bg-white border border-line flex items-center justify-between shadow-sm hover:border-slate-300 transition-colors" id="part-item-1">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-raised flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-category-arthro text-[20px]">videocam</span>
+</div>
+<div>
+<div class="font-label-md text-on-surface font-bold text-[14px]">CrossFire 2 RF &amp; Shaver 통합 콘솔</div>
+<div class="text-[11px] text-on-surface-subtle">Dual Motorized Control &amp; Bipolar Ablation</div>
+</div>
+</div>
+<span class="font-mono text-[11px] text-category-arthro font-bold whitespace-nowrap ml-2">IN-STOCK</span>
+</div>
+<div class="p-3.5 rounded bg-white border border-line flex items-center justify-between shadow-sm hover:border-slate-300 transition-colors" id="part-item-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-raised flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-category-arthro text-[20px]">build</span>
+</div>
+<div>
+<div class="font-label-md text-on-surface font-bold text-[14px]">Formula Shaver Handpiece</div>
+<div class="text-[11px] text-on-surface-subtle">12,000 RPM 고속 정밀 연골 절제</div>
+</div>
+</div>
+<span class="font-mono text-[11px] text-category-arthro font-bold whitespace-nowrap ml-2">IN-STOCK</span>
+</div>
+<div class="p-3.5 rounded bg-white border border-line flex items-center justify-between shadow-sm hover:border-slate-300 transition-colors" id="part-item-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-raised flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-category-arthro text-[20px]">anchor</span>
+</div>
+<div>
+<div class="font-label-md text-on-surface font-bold text-[14px]">ICONIX &amp; PEEK All-Suture Anchor</div>
+<div class="text-[11px] text-on-surface-subtle">최대 인장력 회전근개 생체 적합 봉합재</div>
+</div>
+</div>
+<span class="font-mono text-[11px] text-category-arthro font-bold whitespace-nowrap ml-2">IN-STOCK</span>
+</div>
+</div>
+</div>
+<div class="pt-6 border-t border-line space-y-2.5">
+<a class="w-full h-[52px] bg-[#FFD400] hover:bg-primary-hover text-[#000000] font-label-md font-bold tracking-wider uppercase rounded-[2px] transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow" href="#inquiry">
+<span class="">선택 부위 전용 데모 및 세트 견적 요청</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+<div class="flex items-center justify-between px-1 text-[11px] font-mono text-on-surface-subtle">
+<span class="">24H RAPID DEMO PROTOCOL</span>
+<span class="text-category-instrument font-semibold">DIRECT SPECIALIST MATCH</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="relative w-full py-28 px-6 lg:px-12 bg-surface-subtle border-b border-line" id="platform-1788">
+<div class="max-w-[1440px] mx-auto space-y-16">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-line">
+<div>
+<div class="flex items-center gap-2 mb-3">
+<span class="w-2 h-2 bg-category-laparo rounded-full"></span>
+<span class="font-label-sm text-category-laparo font-bold tracking-[0.2em] uppercase">Next-Gen Optical Core</span>
+</div>
+<h2 class="tracking-tight">
+<span class="font-headline-lg font-bold text-on-surface block sm:inline">1788 4K OLED Platform</span>
+<span class="font-headline-lg font-light text-slate-400 block sm:inline sm:ml-4">새로운 수술 시각화의 기준</span>
+</h2>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
+<span class="px-2.5 py-1 rounded bg-white border border-line text-[11px] font-mono text-category-instrument font-semibold shadow-sm">IRIS™ 요관감지</span>
+<span class="px-2.5 py-1 rounded bg-white border border-line text-[11px] font-mono text-category-laparo font-semibold shadow-sm">SPY CSI / CSF</span>
+<span class="px-2.5 py-1 rounded bg-white border border-line text-[11px] font-mono text-on-surface font-semibold shadow-sm">HDR 10-BIT</span>
+<span class="px-2.5 py-1 rounded bg-white border border-line text-[11px] font-mono text-category-arthro font-semibold shadow-sm">Tone Mode</span>
+</div>
+</div>
+<div class="w-full bg-white rounded-[4px] border border-line p-6 lg:p-8 space-y-6 shadow-sm">
+<div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-line">
+<div>
+<div class="font-label-md text-on-surface uppercase tracking-wider flex items-center gap-2 font-bold">
+<span class="material-symbols-outlined text-[18px] text-category-instrument">tune</span>
+              Advanced Imaging Modality Selector
+            </div>
+<p class="text-[13px] text-on-surface-subtle mt-0.5">전환 버튼을 클릭하여 Stryker 1788 형광 시각화 모드를 즉각 시뮬레이션하십시오.</p>
+</div>
+<div class="inline-flex p-1 bg-surface-raised rounded border border-line gap-1" id="mode-selector-group">
+<button class="px-4 py-2 rounded-[2px] font-label-sm tracking-wider transition-all text-on-surface-muted hover:text-on-surface bg-transparent font-medium" id="btn-mode-white">
+              1. White Light
+            </button>
+<button class="px-4 py-2 rounded-[2px] font-label-sm tracking-wider transition-all text-[#000000] font-bold bg-[#FFD400] shadow-sm" id="btn-mode-overlay">
+              2. Overlay (Active)
+            </button>
+<button class="px-4 py-2 rounded-[2px] font-label-sm tracking-wider transition-all text-on-surface-muted hover:text-on-surface bg-transparent font-medium" id="btn-mode-env">
+              3. ENV (Green Split)
+            </button>
+<button class="px-4 py-2 rounded-[2px] font-label-sm tracking-wider transition-all text-on-surface-muted hover:text-on-surface bg-transparent font-medium" id="btn-mode-contrast">
+              4. Contrast (B&amp;W)
+            </button>
+</div>
+</div>
+<div class="relative w-full aspect-[16/9] max-h-[560px] rounded bg-black border border-slate-800 overflow-hidden flex items-center justify-center shadow-lg">
+<div class="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between z-20">
+<div class="flex justify-between items-start font-mono text-[11px] text-slate-300">
+<div class="bg-black/75 px-3 py-1.5 rounded border border-white/20 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#FFD400] animate-pulse"></span>
+<span class="text-white font-bold" id="hud-mode-title">MODE: OVERLAY [FLUORESCENCE HYBRID]</span>
+</div>
+<div class="bg-black/75 px-3 py-1.5 rounded border border-white/20 text-right">
+<div class="">SENSOR: 1/2" CMOS 4K UHD</div>
+<div class="">LUT: DCI-P3 100% REC.2020</div>
+</div>
+</div>
+<div class="absolute inset-0 m-auto w-12 h-12 pointer-events-none flex items-center justify-center opacity-60">
+<div class="w-full h-[1px] bg-[#FFD400]"></div>
+<div class="h-full w-[1px] bg-[#FFD400] absolute"></div>
+</div>
+<div class="flex justify-between items-end font-mono text-[11px] text-slate-300">
+<div class="bg-black/75 px-3 py-1.5 rounded border border-white/20">
+<span class="">IRIS™ URETER TRACKING: </span>
+<span class="text-emerald-400 font-bold">LOCKED 99.8%</span>
+</div>
+<div class="bg-black/75 px-3 py-1.5 rounded border border-white/20 text-[#FFD400] font-bold">
+                STRYKER AIM ACTIVE INFRARED MATRIX
+              </div>
+</div>
+</div>
+<div class="relative w-full h-full" id="sim-viewport">
+<img class="w-full h-full object-cover filter transition-all duration-500" id="sim-image" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMa4Bkql_Z5bfENb9pdNoW_FNfoPs7h8bDu-0DxL4Rao_PrRq5oG5SpOyHADnx9wifd4LAFm8TLEWqQ0A3RPpCvwGTNnxzE29UwBcVdz-Vra_Bsxf9UwCRcAUKpwAjfxu0Jnw1Ekbn7Rl6RdRZ_04dlpzf6F_9hFrB77V7QhpBasBh1hJe4GitKHb85DowfCRHkLjQRVrpHWMiW69irabDQzaj_t2pYwnEcQ_34cx4Rzm5JTdNumJ4dw">
+<div class="absolute inset-0 bg-category-laparo/20 mix-blend-screen pointer-events-none transition-opacity duration-500" id="sim-glow"></div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+<div class="p-4 rounded bg-surface-subtle border border-line text-left">
+<div class="font-label-sm text-on-surface-muted mb-1 font-bold">01 White Light</div>
+<p class="text-[13px] text-on-surface-subtle">왜곡 없는 3840×2160 초고해상도 자연색 수술 시야 제공.</p>
+</div>
+<div class="p-4 rounded bg-amber-50/50 border border-amber-300 text-left shadow-sm">
+<div class="font-label-sm text-category-instrument mb-1 font-bold">02 Overlay (기본 권장)</div>
+<p class="text-[13px] text-on-surface-subtle">일반 해부학적 구조 위에 실시간 녹색 ICG 형광 혈류를 동시 합성.</p>
+</div>
+<div class="p-4 rounded bg-surface-subtle border border-line text-left">
+<div class="font-label-sm text-on-surface-muted mb-1 font-bold">03 ENV (Green Split)</div>
+<p class="text-[13px] text-on-surface-subtle">배경을 그레이스케일로 감쇄하고 목표 혈류 조직만 초록으로 극대화.</p>
+</div>
+<div class="p-4 rounded bg-surface-subtle border border-line text-left">
+<div class="font-label-sm text-on-surface-muted mb-1 font-bold">04 Contrast (B&amp;W)</div>
+<p class="text-[13px] text-on-surface-subtle">혈류 흐름과 미세 림프절을 흑백 최고 대비로 분리하여 미세 결손 식별.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
+<div class="p-6 rounded bg-white border border-line flex flex-col justify-between shadow-sm">
+<div class="font-label-sm text-on-surface-subtle uppercase font-bold">RESOLUTION</div>
+<div class="my-4">
+<span class="font-spec-number text-on-surface font-extrabold text-[44px]">4K</span>
+</div>
+<div class="text-[12px] font-mono text-category-instrument font-semibold">3840 × 2160 / Native</div>
+</div>
+<div class="p-6 rounded bg-white border border-line flex flex-col justify-between shadow-sm">
+<div class="font-label-sm text-on-surface-subtle uppercase font-bold">CONTRAST RATIO</div>
+<div class="my-4">
+<span class="font-headline-md lg:text-[44px] text-on-surface font-extrabold">1M:1</span>
+</div>
+<div class="text-[12px] font-mono text-category-laparo font-semibold">Infinite True Black OLED</div>
+</div>
+<div class="p-6 rounded bg-white border border-line flex flex-col justify-between shadow-sm">
+<div class="font-label-sm text-on-surface-subtle uppercase font-bold">COLOR SPECTRUM</div>
+<div class="my-4">
+<span class="font-spec-number text-on-surface font-extrabold text-[44px]">10<span class="font-spec-unit text-category-instrument">억+</span></span>
+</div>
+<div class="text-[12px] font-mono text-on-surface-muted font-semibold">10-Bit DCI-P3 Gamut</div>
+</div>
+<div class="p-6 rounded bg-white border border-line flex flex-col justify-between shadow-sm">
+<div class="font-label-sm text-on-surface-subtle uppercase font-bold">COLOR FIDELITY</div>
+<div class="my-4">
+<span class="font-spec-number text-on-surface font-extrabold text-[44px]">62.5<span class="font-spec-unit text-category-arthro">×</span></span>
+</div>
+<div class="text-[12px] font-mono text-category-arthro font-semibold">기존 HD 시스템 대비 정밀도</div>
+</div>
+</div>
+<div class="space-y-6 pt-6">
+<div class="flex items-center justify-between">
+<div class="font-label-md text-on-surface tracking-widest uppercase font-bold">Target Specialty Workflows</div>
+<div class="font-label-sm text-on-surface-subtle font-semibold">6 CLINICAL DISCIPLINES</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="p-6 rounded bg-white border border-line hover:border-category-laparo transition-all group shadow-sm hover:shadow-md">
+<div class="flex items-center justify-between mb-4">
+<span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-category-laparo font-label-sm font-semibold border border-emerald-200">GS 일반외과</span>
+<span class="material-symbols-outlined text-on-surface-subtle text-[18px]">emergency</span>
+</div>
+<div class="font-title-md text-on-surface mb-2 font-bold">간담췌 및 대장항문 관류 평가</div>
+<p class="font-body-sm text-on-surface-muted leading-relaxed">SPY 형광 기술을 통한 문합부(Anastomosis) 혈류 관류 상태 즉각 판정 및 허혈성 합병증 예방.</p>
+</div>
+<div class="p-6 rounded bg-white border border-line hover:border-category-instrument transition-all group shadow-sm hover:shadow-md">
+<div class="flex items-center justify-between mb-4">
+<span class="px-2.5 py-0.5 rounded-full bg-amber-50 text-category-instrument font-label-sm font-semibold border border-amber-200">URO 비뇨의학과</span>
+<span class="material-symbols-outlined text-on-surface-subtle text-[18px]">health_and_safety</span>
+</div>
+<div class="font-title-md text-on-surface mb-2 font-bold">IRIS™ 실시간 요관 네비게이션</div>
+<p class="font-body-sm text-on-surface-muted leading-relaxed">골반강 및 후복막 수술 시 요관에 투입된 특수 카테터 광원을 실시간 감지하여 우발적 손상 원천 차단.</p>
+</div>
+<div class="p-6 rounded bg-white border border-line hover:border-category-arthro transition-all group shadow-sm hover:shadow-md">
+<div class="flex items-center justify-between mb-4">
+<span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-category-arthro font-label-sm border border-indigo-200">OS 정형외과</span>
+<span class="material-symbols-outlined text-on-surface-subtle text-[18px]">orthopedics</span>
+</div>
+<div class="font-title-md text-on-surface mb-2 font-bold">초고해상도 관절강 내 결손 식별</div>
+<p class="font-body-sm text-on-surface-muted leading-relaxed">Tone Mode를 통한 연골 및 인대 조직 세밀 대비 표현, 활액 내 산란광 억제 및 수술 피로도 완화.</p>
+</div>
+<div class="p-6 rounded bg-white border border-line hover:border-category-laparo transition-all group shadow-sm hover:shadow-md">
+<div class="flex items-center justify-between mb-4">
+<span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-category-laparo font-label-sm border border-emerald-200">GYN 산부인과</span>
+<span class="material-symbols-outlined text-on-surface-subtle text-[18px]">female</span>
+</div>
+<div class="font-title-md text-on-surface mb-2 font-bold">감시 림프절 (Sentinel Node) 매핑</div>
+<p class="font-body-sm text-on-surface-muted leading-relaxed">부인암 수술 시 미세 림프 경로 추적 및 정확한 절제 범위 유도를 통한 림프부종 최소화.</p>
+</div>
+<div class="p-6 rounded bg-white border border-line hover:border-category-instrument transition-all group shadow-sm hover:shadow-md">
+<div class="flex items-center justify-between mb-4">
+<span class="px-2.5 py-0.5 rounded-full bg-amber-50 text-category-instrument font-label-sm border border-amber-200">ENT / NS 이비인후과·신경외과</span>
+<span class="material-symbols-outlined text-on-surface-subtle text-[18px]">neurology</span>
+</div>
+<div class="font-title-md text-on-surface mb-2 font-bold">두개저(Skull Base) 미세 혈관 수술</div>
+<p class="font-body-sm text-on-surface-muted leading-relaxed">미세 공간 내 4K 초근접 포커싱 및 뇌혈관 관류 동역학 실시간 피드백 지원.</p>
+</div>
+<div class="p-6 rounded bg-white border border-line hover:border-category-arthro transition-all group shadow-sm hover:shadow-md">
+<div class="flex items-center justify-between mb-4">
+<span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-category-arthro font-label-sm border border-indigo-200">CS 흉부외과</span>
+<span class="material-symbols-outlined text-on-surface-subtle text-[18px]">pulmonology</span>
+</div>
+<div class="font-title-md text-on-surface mb-2 font-bold">폐구역 절제술 (Segmentectomy) 경계 식별</div>
+<p class="font-body-sm text-on-surface-muted leading-relaxed">ICG 형광 주입을 통해 정상 폐포와 절제 부위 구역 간의 경계면을 명확하게 가시화.</p>
+</div>
+</div>
+</div>
+<div class="pt-16 border-t border-line space-y-16" id="core-divisions">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-line">
+<div>
+<div class="font-label-sm text-category-instrument uppercase tracking-[0.2em] mb-2 font-bold">Core Product Divisions</div>
+<h2 class="font-headline-lg font-bold text-on-surface">수멕스 핵심 공급 솔루션</h2>
+</div>
+<p class="font-body-md text-on-surface-muted max-w-md">
+          정형관절경, 복강경 수술 비전 및 외과용 전동 드릴 시스템까지 Stryker 전 라인업을 신속하고 정확하게 기술 지원합니다.
+        </p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="relative bg-white rounded-[4px] border border-line p-8 flex flex-col justify-between hover:border-category-arthro transition-all duration-300 group shadow-sm hover:shadow-lg">
+<div class="absolute top-0 left-0 right-0 h-[3px] bg-category-arthro"></div>
+<div>
+<div class="flex items-center justify-between mb-6">
+<span class="px-2.5 py-1 rounded-full bg-indigo-50 text-category-arthro font-label-sm border border-indigo-200 font-bold">
+                OS / NS 관절경 수술
+              </span>
+<span class="font-mono text-on-surface-subtle text-[11px] font-semibold">DIV // 01</span>
+</div>
+<h3 class="font-headline-md text-[32px] text-on-surface group-hover:text-category-arthro transition-colors font-bold">
+              ARTHRO
+            </h3>
+<p class="font-title-md text-on-surface-muted mt-1 font-medium">
+              관절경 수술의 모든 것
+            </p>
+<div class="my-6 aspect-[16/10] rounded overflow-hidden bg-slate-100 border border-line">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9YRZXsitMAJGJkEF0VBLTRdKeOPqRT7nRwOGei-_4eMZTs5d7uH2zfxXxK4eZOou6VOYFXw99DHBbzfKImhwKqF10L4CC0C5In6_VoiTyE7YG5uqRSuxPvbDAJf-0HtFtOMVjvmumpNBvJecnRTEeqkfTCxn2FeNknI-7cBsBenuAkHFeJLvhFP_9PzLsGsUqGEV2pQb2uBknzWNU3JqztgqNEWy-dTHgjEBXB8C1ZJiD5e3OwGY2sA">
+</div>
+<div class="space-y-3 font-body-sm text-on-surface-muted"><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">1688 AIM 4K Camera</span></div><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">CrossFire 2 Console</span></div><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">CrossFlow Arthroscopy Pump</span></div></div>
+</div>
+<div class="pt-8">
+<a class="w-full h-[46px] rounded bg-surface-raised border border-line group-hover:border-category-arthro text-on-surface hover:text-category-arthro font-label-sm font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm" href="#inquiry">
+<span class="">ARTHRO 카탈로그 신청</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="relative bg-white rounded-[4px] border border-line p-8 flex flex-col justify-between hover:border-category-laparo transition-all duration-300 group shadow-sm hover:shadow-lg">
+<div class="absolute top-0 left-0 right-0 h-[3px] bg-category-laparo"></div>
+<div>
+<div class="flex items-center justify-between mb-6">
+<span class="px-2.5 py-1 rounded-full bg-emerald-50 text-category-laparo font-label-sm border border-emerald-200 font-bold">
+                GS / URO 복강경 수술
+              </span>
+<span class="font-mono text-on-surface-subtle text-[11px] font-semibold">DIV // 02</span>
+</div>
+<h3 class="font-headline-md text-[32px] text-on-surface group-hover:text-category-laparo transition-colors font-bold">
+              LAPARO
+            </h3>
+<p class="font-title-md text-on-surface-muted mt-1 font-medium">
+              4K 형광 복강경 수술
+            </p>
+<div class="my-6 aspect-[16/10] rounded overflow-hidden bg-slate-100 border border-line">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgebZlp2I7CK0S4qlxwwgVMutvoShD9HbZEJyX2rQZjtgDNkQQO6PI_T7v1YbM3vsZKQt6VdplDn7d8CaYUCbu6cL234Cojo7HnW_cHtSGlMxqEh0j5vfp44knNy0G2UwIYR6sLr7ywfvsUAXZUDI_vOzc4oP40rlWbknzAGFnt9cqtZeoaII1yzlWcrOzdf6iy8qeuqE-Q_dTzoyfLlcN0JVkTmexkHnhxTolHYnbpZewrrCNoZCdMQ">
+</div>
+<div class="space-y-3 font-body-sm text-on-surface-muted"><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">1788 AIM Platform</span></div><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">PneumoClear Insufflator</span></div><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">SPY-PHI Portable Fluorescence</span></div></div>
+</div>
+<div class="pt-8">
+<a class="w-full h-[46px] rounded bg-surface-raised border border-line group-hover:border-category-laparo text-on-surface hover:text-category-laparo font-label-sm font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm" href="#inquiry">
+<span class="">LAPARO 카탈로그 신청</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="relative bg-white rounded-[4px] border border-line p-8 flex flex-col justify-between hover:border-category-instrument transition-all duration-300 group shadow-sm hover:shadow-lg">
+<div class="absolute top-0 left-0 right-0 h-[3px] bg-category-instrument"></div>
+<div>
+<div class="flex items-center justify-between mb-6">
+<span class="px-2.5 py-1 rounded-full bg-amber-50 text-category-instrument font-label-sm border border-amber-200 font-bold">
+                OS / NS 외과용 파워툴
+              </span>
+<span class="font-mono text-on-surface-subtle text-[11px] font-semibold">DIV // 03</span>
+</div>
+<h3 class="font-headline-md text-[32px] text-on-surface group-hover:text-category-instrument transition-colors font-bold">
+              INSTRUMENT
+            </h3>
+<p class="font-title-md text-on-surface-muted mt-1 font-medium">
+              정밀한 파워와 제어
+            </p>
+<div class="my-6 aspect-[16/10] rounded overflow-hidden bg-slate-100 border border-line">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtOWZHAyQXIR6czVE8qbpcNx2bLEeYDCsW8DctZDnOXdv3Yk2KtHeGbPSsGfzGUwexp19JsWDStYe8AKLjYbuzmSOWuf5GbRFMR4W_UlnlKaiYtO_nqZ-mqgVJ2ZtTq4YZod_4pfCF1v4HVJo7d0C-yERfqABQPgvc3_iWojmlJd07CJLJjIkP27I57mjeuJX7MF2F8WBXVrrvrKjpjWYceBVCvpuOO7TtpS6lteOfeHrrK3syTd4NnQ">
+</div>
+<div class="space-y-3 font-body-sm text-on-surface-muted"><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">System 9 Heavy Power</span></div><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">Signature 2 High-Speed Drill</span></div><div class="flex items-center justify-between border-b border-line pb-2"><span class="text-on-surface font-semibold text-left">TPX Micro Power System</span></div></div>
+</div>
+<div class="pt-8">
+<a class="w-full h-[46px] rounded bg-surface-raised border border-line group-hover:border-category-instrument text-on-surface hover:text-category-instrument font-label-sm font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm" href="#inquiry">
+<span class="">INSTRUMENT 카탈로그 신청</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full py-28 px-6 lg:px-12 bg-surface-subtle border-b border-line" id="newsletter">
+<div class="max-w-[1440px] mx-auto space-y-12">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-line">
+<div class="flex items-center gap-3">
+<span class="w-2.5 h-2.5 bg-category-instrument"></span>
+<span class="font-headline-md text-[24px] text-on-surface font-bold tracking-tight">SUMEX DAILY DISPATCH</span>
+<span class="px-2.5 py-0.5 rounded bg-white border border-line text-[11px] font-mono text-on-surface-subtle font-semibold shadow-sm">
+            ISSUE · 2026.10.10
+          </span>
+</div>
+<div class="flex items-center gap-4">
+<a class="font-label-sm text-category-instrument hover:underline flex items-center gap-1 font-bold" href="#">
+<span class="">뉴스레터 아카이브 전체보기</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<article class="bg-white rounded-[4px] border border-line overflow-hidden hover:border-line-strong transition-all flex flex-col justify-between group shadow-sm hover:shadow-md">
+<div>
+<div class="aspect-[4/5] w-full overflow-hidden bg-slate-100 relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXIaJ3ZM4wyxGHdRjEDMClrZCW_5Mo908hAlyu8YK7zqlRIUkYEm-h-Z5lGeUbq5YA7DMsaS9PXIeJRQCnSZeL0jEmvH9RbG-vW-04N3uRfQwMuXdyM8ixCqAqrFRQPByaVGGK8wDL9dacJZCJxWeO0hKFxdhkFpgF6AE_v8JrYnHokRXJOMrwN0PUuH4ObTUDjw4ElW04yPP6KkDGVDjzcaDYpMzEWKTOT6diNdhf15M15DOU6mDSMQ">
+<span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-white/90 backdrop-blur-sm border border-line font-mono text-[10px] text-category-instrument font-bold">
+                CARD 01/07
+              </span>
+</div>
+<div class="p-5 space-y-2">
+<div class="text-[11px] font-mono text-on-surface-subtle font-semibold">CLINICAL SYMPOSIUM</div>
+<h3 class="font-title-md text-[18px] text-on-surface font-bold leading-snug group-hover:text-category-instrument transition-colors">
+                2026 대한관절경학회 추계학술대회 Stryker 전시 하이라이트
+              </h3>
+<p class="font-body-sm text-on-surface-muted text-[13px] line-clamp-2">
+                1788 AIM 4K 플랫폼을 활용한 회전근개 복원술 라이브 서저리 리뷰 및 최신 임상 피드백.
+              </p>
+</div>
+</div>
+<div class="p-5 pt-0 text-[11px] font-mono text-on-surface-subtle flex justify-between border-t border-line/60">
+<span class="font-medium">OCT 10, 2026</span>
+<span class="text-category-instrument font-bold">READ 3 MIN</span>
+</div>
+</article>
+<article class="bg-white rounded-[4px] border border-line overflow-hidden hover:border-line-strong transition-all flex flex-col justify-between group shadow-sm hover:shadow-md">
+<div>
+<div class="aspect-[4/5] w-full overflow-hidden bg-slate-100 relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcK87DzPZcO9DKebQkX-8DpZ-syaYJSXZt2xIhrh9vH1_eItoFJMvlmTuj_3qn8SHv6dFDtti_UrUGvyw8uHxHpzdCIFlhAo8ca0OWOKilKEqSvZ7nzGLEWHCu_mGiGL7UVKUj0m_IJD77ahUSVcijsbeJILN3_0atqgcHDwVxWSrnId58DZ6DLsyfC71mRfdKb1_KuM6frOPDRFtbs5yVPBfF1P9RadL_Kjatc25sitiAiGsvpKSbMA">
+<span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-white/90 backdrop-blur-sm border border-line font-mono text-[10px] text-category-laparo font-bold">
+                CARD 02/07
+              </span>
+</div>
+<div class="p-5 space-y-2">
+<div class="text-[11px] font-mono text-on-surface-subtle font-semibold">TECH DEEP DIVE</div>
+<h3 class="font-title-md text-[18px] text-on-surface font-bold leading-snug group-hover:text-category-laparo transition-colors">
+                OLED True Black vs 일반 LCD: 수술 피로도 42% 감소 데이터
+              </h3>
+<p class="font-body-sm text-on-surface-muted text-[13px] line-clamp-2">
+                명암비 1,000,000:1이 복강경 장시간 수술 시 집도의의 시각 피로도에 미치는 임상 분석 보고서.
+              </p>
+</div>
+</div>
+<div class="p-5 pt-0 text-[11px] font-mono text-on-surface-subtle flex justify-between border-t border-line/60">
+<span class="font-medium">OCT 08, 2026</span>
+<span class="text-category-laparo font-bold">TECH REPORT</span>
+</div>
+</article>
+<article class="bg-white rounded-[4px] border border-line overflow-hidden hover:border-line-strong transition-all flex flex-col justify-between group shadow-sm hover:shadow-md">
+<div>
+<div class="aspect-[4/5] w-full overflow-hidden bg-slate-100 relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2kQT4paaST2rnWaQVjYvYC5CZxRL7iPdKFytQ0pbCVFNCKLbtt80ZiJr1Ma6bXWLNn1kS5Ik_bzHwbJtMTQflhTQs4qLJ1qm3tkV6okfe7a3zQpfNZWMAOWeFTXcaVU3jj2nrgad2upoIQCGOun2hY7CT2KGSqHNJ1ZKovpAQKcQj0pB8twVlOUUX28uON7vfsI7orGmaov8ww0x_cpz1H7Z_aFI9e0Bq6ii1N7Cn-1dXAfic7ijfVw">
+<span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-white/90 backdrop-blur-sm border border-line font-mono text-[10px] text-category-instrument font-bold">
+                CARD 03/07
+              </span>
+</div>
+<div class="p-5 space-y-2">
+<div class="text-[11px] font-mono text-on-surface-subtle font-semibold">REGULATORY UPDATE</div>
+<h3 class="font-title-md text-[18px] text-on-surface font-bold leading-snug group-hover:text-category-instrument transition-colors">
+                수술실 연기 배출 의무화 추진: PneumoClear 솔루션 가이드
+              </h3>
+<p class="font-body-sm text-on-surface-muted text-[13px] line-clamp-2">
+                의료진 호흡기 보호와 선명한 수술 시야를 동시에 보장하는 일체형 50L 기복 배연 시스템.
+              </p>
+</div>
+</div>
+<div class="p-5 pt-0 text-[11px] font-mono text-on-surface-subtle flex justify-between border-t border-line/60">
+<span class="font-medium">OCT 05, 2026</span>
+<span class="text-category-instrument font-bold">SAFETY GUIDE</span>
+</div>
+</article>
+<article class="bg-white rounded-[4px] border border-line overflow-hidden hover:border-line-strong transition-all flex flex-col justify-between group shadow-sm hover:shadow-md">
+<div>
+<div class="aspect-[4/5] w-full overflow-hidden bg-slate-100 relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2BeOIfEJTR0HMlVfZIbxJ4Me4MogQEF2Ppr5IQ59e7nC_0FQOaMbl_5ehYWbUEuE_PW2X__US3dTTh767HgPjZH5nkqdCJPcQDR0v8vfzp2GJ_hoXxzYtp9unYXIt92VWBU2HzFgC_K83eCmHEjSKISCqLhRW0JviHB0gGCl07caZRIGKVulBwcTkJEKKcrPOYOf0JaA3kAxyl8Z4l8dNattRxlYE_XB5ha3xTPoaO9CjFUU41l64ew">
+<span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-white/90 backdrop-blur-sm border border-line font-mono text-[10px] text-category-arthro font-bold">
+                CARD 04/07
+              </span>
+</div>
+<div class="p-5 space-y-2">
+<div class="text-[11px] font-mono text-on-surface-subtle font-semibold">NEW ARRIVAL</div>
+<h3 class="font-title-md text-[18px] text-on-surface font-bold leading-snug group-hover:text-category-arthro transition-colors">
+                System 9 파워툴 국내 주요 3차 병원 15곳 신규 도입 완료
+              </h3>
+<p class="font-body-sm text-on-surface-muted text-[13px] line-clamp-2">
+                향상된 토크 제어와 방수 밀폐 성능으로 정형외과 대형 골 수술 생산성 혁신 달성.
+              </p>
+</div>
+</div>
+<div class="p-5 pt-0 text-[11px] font-mono text-on-surface-subtle flex justify-between border-t border-line/60">
+<span class="font-medium">OCT 01, 2026</span>
+<span class="text-category-arthro font-bold">CASE STUDY</span>
+</div>
+</article>
+</div>
+<div class="p-8 rounded bg-white border border-line flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+<div class="space-y-1">
+<div class="font-headline-md text-[20px] text-on-surface font-bold">최신 Stryker 외과 광학 임상 리포트를 정기 구독하세요</div>
+<p class="font-body-sm text-on-surface-muted">매월 첫째 주 화요일, 신제품 승인 내역과 최신 학회 비디오 세션을 전달합니다.</p>
+</div>
+<div class="flex items-center gap-3 w-full md:w-auto">
+<a class="h-[48px] px-6 bg-[#FFD400] hover:bg-primary-hover text-[#000000] font-label-md font-bold tracking-wider rounded-[2px] transition-all flex items-center gap-2 whitespace-nowrap shadow-sm" href="#">
+<span class="">메디컬 뉴스레터 구독</span>
+<span class="material-symbols-outlined text-[16px]">mail</span>
+</a>
+<a class="h-[48px] px-5 rounded bg-surface-raised border border-line hover:border-line-strong font-label-md text-on-surface font-bold transition-all flex items-center gap-2 whitespace-nowrap shadow-sm" href="#" target="_blank">
+<span class="material-symbols-outlined text-[18px] text-category-instrument">chat</span>
+<span class="">카카오톡 빠른 상담</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<section class="relative w-full py-28 px-6 lg:px-12 bg-white border-b border-line overflow-hidden">
+<div class="max-w-[1080px] mx-auto relative z-10 space-y-12">
+<div class="flex items-center gap-3">
+<span class="w-8 h-[2px] bg-category-instrument"></span>
+<span class="font-label-sm text-category-instrument uppercase tracking-[0.2em] font-bold">Leadership Philosophy</span>
+</div>
+<div class="space-y-8">
+<blockquote class="font-headline-md lg:text-[44px] lg:leading-[56px] text-on-surface font-extrabold tracking-tight">
+          "수술실의 1초, 1mm는 환자의 내일을 바꿉니다.<br>
+<span class="text-category-instrument">No Gray, Only Great</span>의 기준으로 현장을 지원합니다."
+        </blockquote>
+<p class="font-body-lg text-on-surface-muted max-w-2xl font-normal leading-relaxed text-[17px]">
+          수멕스(SUMEX)는 단순한 의료기기 유통사를 넘어, 수술실 안에서 벌어지는 생명의 순간에 완벽한 시각적 신뢰성을 부여하는 파트너입니다.
+          Stryker의 최첨단 기술이 집도의의 손끝과 온전히 동기화될 수 있도록 검증된 정품 공급과 24/7 전문 엔지니어링 지원을 약속드립니다.
+        </p>
+</div>
+<div class="pt-8 border-t border-line flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+<div>
+<div class="font-title-md text-on-surface text-[18px] font-bold">최승수 대표이사</div>
+<div class="font-label-sm text-on-surface-subtle mt-0.5 font-medium">CEO &amp; Managing Director · 주식회사 수멕스 (SUMEX Corp.)</div>
+</div>
+<div class="flex items-center gap-4 text-on-surface-subtle font-mono text-[11px] font-medium">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-category-laparo"></span>
+<span class="">ISO 13485 CERTIFIED OPERATION</span>
+</div>
+<span class="text-line-strong">|</span>
+<span class="">SEOUL KOREA HQ</span>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full py-16 px-6 lg:px-12 bg-surface-subtle" id="inquiry">
+<div class="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 p-8 rounded bg-white border border-line items-center shadow-sm">
+<div class="space-y-2 lg:col-span-2">
+<div class="flex items-center gap-2 font-label-sm text-category-instrument font-bold">
+<span class="material-symbols-outlined text-[16px]">precision_manufacturing</span>
+          STRYKER HARDWARE CLINICAL DEMO REQUEST
+        </div>
+<h3 class="font-headline-md text-[28px] text-on-surface font-bold">우리 병원에 맞는 제품 견적 받기 및 데모 신청하기</h3>
+<p class="font-body-sm text-on-surface-muted">
+          전담 기술 지원팀이 원하시는 일정에 맞춰 병원 수술실 현장 데모 및 카탈로그 견적을 지원합니다.
+        </p>
+</div>
+<div class="flex flex-col sm:flex-row lg:flex-col gap-3 justify-end">
+<a class="h-[52px] px-6 bg-[#FFD400] hover:bg-primary-hover text-[#000000] font-label-md font-bold tracking-wider rounded-[2px] transition-all flex items-center justify-center gap-2 shadow-sm" href="tel:02-2157-8008">
+<span class="material-symbols-outlined text-[20px]">call</span>
+<span class="">전화 상담 (02-2157-8008)</span>
+</a>
+<a class="h-[52px] px-6 bg-surface-raised border border-line hover:border-line-strong text-on-surface font-label-md font-bold tracking-wider rounded-[2px] transition-all flex items-center justify-center gap-2 shadow-sm" href="mailto:contact@sumex.co.kr">
+<span class="material-symbols-outlined text-[20px]">mail</span>
+<span class="">이메일 견적 문의</span>
+</a>
+</div>
+</div>
+</section>
+</div>
+</main><footer class="w-full bg-surface-subtle border-t border-line"><div class="max-w-[1440px] mx-auto px-6 lg:px-12 pt-16 pb-12"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-16 border-b border-line"><div class="flex flex-col"><div class="flex items-center gap-3 mb-5"><img alt="SUMEX" class="h-7 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUvgbFOCZarXcmVtx9MNfOvqMw_M_NpOsyEYfBzazwkqpv4Exk-2cdUnF7JU55hNkLE-vqHUmFWIZ7AUUKAxpu-oOuUBqxJT0cII6Y5Zdf8laEBAGU9kFWb-XXxJ5pcAMeacrmeWL58LgbhMhjN9prgErb7FCFU5bILlH2P8EriCv-8nWzx2bGHbwjt005KUBvPuijYD4o9zc_KVL2m45z7guLHHrE3-yesCSvh1NsuvVkOqoo6KoEtwH4AcuBUKynGOU"></div><p class="font-body-sm text-on-surface-muted max-w-xs leading-relaxed">Surgical &amp; Medical healthcare supplier delivering Excellence across next-generation endoscopic visualization platforms.</p><div class="mt-6 flex items-center gap-2 font-label-sm text-on-surface-subtle font-medium"><span class="w-2 h-2 rounded-full bg-category-laparo"></span><span class="">CAD PRECISION MATRIX VERIFIED</span></div></div><div class="flex flex-col"><span class="font-label-md text-on-surface font-bold tracking-wider uppercase mb-5">QUICK NAVIGATION</span><div class="grid grid-cols-2 gap-2.5 font-body-sm text-on-surface-muted font-medium"><a class="hover:text-category-instrument transition-colors" href="#about">회사소개</a><a class="hover:text-category-instrument transition-colors" href="#ai-search">AI 제품검색</a><a class="hover:text-category-instrument transition-colors" href="#anatomy-finder">신체 부위별 제품</a><a class="hover:text-category-instrument transition-colors" href="#platform-1788">1788 4K 플랫폼</a><a class="hover:text-category-instrument transition-colors" href="#core-divisions">ARTHRO 솔루션</a><a class="hover:text-category-instrument transition-colors" href="#core-divisions">LAPARO 솔루션</a><a class="hover:text-category-instrument transition-colors" href="#core-divisions">INSTRUMENT 파워툴</a><a class="hover:text-category-instrument transition-colors" href="#inquiry">고객문의</a></div></div><div class="flex flex-col"><span class="font-label-md text-on-surface font-bold tracking-wider uppercase mb-5">CORPORATE INFO</span><div class="space-y-2 font-body-sm text-on-surface-muted leading-relaxed font-medium"><p class="text-on-surface font-bold">(주)수멕스 | SUMEX Corp.</p><p class="">대표이사: 최승수</p><p class="">사업자등록번호: 435-81-03240</p><p class="">주소: 서울특별시 송파구 충민로 66, 가든파이브라이프 T동 8층 T-8008호</p><p class="pt-1 font-label-sm text-category-instrument font-bold">TEL: 02-2157-8008 | FAX: 02-2157-8009</p></div></div><div class="flex flex-col"><span class="font-label-md text-on-surface font-bold tracking-wider uppercase mb-5">COMMUNICATION &amp; CHANNELS</span><div class="flex items-center gap-2 mb-6"><a class="w-9 h-9 rounded bg-white border border-line hover:border-category-instrument hover:text-category-instrument flex items-center justify-center text-on-surface-subtle transition-all shadow-sm" href="#" title="Instagram"><span class="material-symbols-outlined text-[18px]">camera</span></a><a class="w-9 h-9 rounded bg-white border border-line hover:border-category-instrument hover:text-category-instrument flex items-center justify-center text-on-surface-subtle transition-all shadow-sm" href="#" title="Blog"><span class="material-symbols-outlined text-[18px]">feed</span></a><a class="w-9 h-9 rounded bg-white border border-line hover:border-category-instrument hover:text-category-instrument flex items-center justify-center text-on-surface-subtle transition-all shadow-sm" href="#" title="YouTube"><span class="material-symbols-outlined text-[18px]">smart_display</span></a></div><span class="font-label-sm text-on-surface-subtle uppercase mb-2 font-semibold">SUBSCRIBE NEWSLETTER</span><a class="group flex items-center justify-between px-3.5 py-2.5 rounded bg-white border border-line hover:border-line-strong text-on-surface font-semibold transition-all shadow-sm" href="#newsletter"><span class="font-body-sm">메디컬 뉴스레터 구독</span><span class="material-symbols-outlined text-[18px] text-category-instrument group-hover:translate-x-1 transition-transform">arrow_forward</span></a></div></div><div class="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 font-label-sm text-on-surface-subtle font-medium"><p class="">© 2026 SUMEX Corp. All rights reserved.</p><div class="flex items-center gap-6"><span class="">LAT: 37.4789° N / LONG: 127.1264° E</span><span class="w-1 h-1 rounded-full bg-slate-300"></span><span class="">ISO 13485 CERTIFIED SPECIFICATION</span></div></div></div></footer>
+</body></html>
