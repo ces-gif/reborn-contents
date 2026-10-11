@@ -1,0 +1,157 @@
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "tailwindcss";
+
+/* DESIGN.md "SUMEX True Black Engineering" 토큰 */
+@theme {
+  --color-primary: #ffd400;
+  --color-primary-hover: #ffe14d;
+  --color-primary-pressed: #e6bf00;
+  --color-on-primary: #000000;
+  --color-secondary: #00af85;
+  --color-tertiary: #8894ff;
+  --color-blend-yg: #a5c72f;
+  --color-blend-yb: #d3bc5e;
+  --color-bg: #000000;
+  --color-surface: #0a0a0b;
+  --color-raised: #111214;
+  --color-overlay: #17181b;
+  --color-line: #1f2124;
+  --color-line-strong: #2e3136;
+  --color-grid: #ffffff0d;
+  --color-fg: #f5f5f5;
+  --color-muted: #a1a6ae;
+  --color-subtle: #6b7079;
+  --color-error: #ff5a5f;
+  --color-arthro: #8894ff;
+  --color-laparo: #00af85;
+  --color-instrument: #ffd400;
+  --color-kakao: #fee500;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --ease-sumex: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.7;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  img,
+  svg {
+    max-width: 100%;
+  }
+}
+
+/* ── 타이포그래피 (DESIGN.md typography + 반응형 표) ── */
+@layer components {
+  .t-display { font-size: 48px; font-weight: 800; line-height: 0.95; letter-spacing: -0.045em; }
+  .t-display-thin { font-size: 48px; font-weight: 200; line-height: 0.95; letter-spacing: -0.04em; }
+  .t-h1 { font-size: 32px; font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; }
+  .t-h1-thin { font-size: 32px; font-weight: 200; line-height: 1.1; letter-spacing: -0.03em; }
+  .t-h2 { font-size: 26px; font-weight: 700; line-height: 1.15; letter-spacing: -0.025em; }
+  .t-h2-thin { font-size: 26px; font-weight: 300; line-height: 1.15; letter-spacing: -0.02em; }
+  .t-title-lg { font-size: 24px; font-weight: 700; line-height: 1.3; letter-spacing: -0.015em; }
+  .t-title-md { font-size: 20px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; }
+  .t-body-lg { font-size: 16px; font-weight: 300; line-height: 1.7; letter-spacing: -0.005em; }
+  .t-body { font-size: 16px; font-weight: 400; line-height: 1.7; }
+  .t-body-sm { font-size: 14px; font-weight: 400; line-height: 1.6; }
+  .t-label { font-size: 13px; font-weight: 600; line-height: 1; letter-spacing: 0.14em; text-transform: uppercase; }
+  .t-label-sm { font-size: 11px; font-weight: 500; line-height: 1; letter-spacing: 0.18em; text-transform: uppercase; }
+  .t-spec { font-size: 44px; font-weight: 200; line-height: 1; letter-spacing: -0.04em; font-feature-settings: "tnum" 1; }
+  .t-unit { font-size: 14px; font-weight: 700; line-height: 1; letter-spacing: 0.08em; }
+  .tnum { font-feature-settings: "tnum" 1; }
+
+  @media (min-width: 768px) {
+    .t-display, .t-display-thin { font-size: 80px; }
+    .t-h1, .t-h1-thin { font-size: 44px; }
+    .t-h2, .t-h2-thin { font-size: 32px; }
+    .t-body-lg { font-size: 18px; }
+    .t-spec { font-size: 56px; }
+    .t-unit { font-size: 16px; }
+  }
+  @media (min-width: 1280px) {
+    .t-display, .t-display-thin { font-size: 112px; }
+    .t-h1, .t-h1-thin { font-size: 56px; }
+    .t-h2 { font-size: 40px; }
+    .t-h2-thin { font-size: 40px; }
+    .t-spec { font-size: 72px; }
+  }
+
+  /* 레이아웃 */
+  .wrap { width: 100%; max-width: 1440px; margin-inline: auto; padding-inline: 20px; }
+  @media (min-width: 768px) { .wrap { padding-inline: 40px; } }
+  @media (min-width: 1280px) { .wrap { padding-inline: 64px; } }
+  .section { padding-block: 96px; }
+  @media (min-width: 1280px) { .section { padding-block: 160px; } }
+
+  /* 80px 그리드 배경 (흰색 5%) */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--color-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-grid) 1px, transparent 1px);
+    background-size: 80px 80px;
+  }
+
+  /* 로고 그라데이션 라인 */
+  .line-yg { background: linear-gradient(90deg, #ffd400 0%, #a5c72f 50%, #00af85 100%); }
+  .line-yb { background: linear-gradient(90deg, #ffd400 0%, #d3bc5e 50%, #8894ff 100%); }
+
+  /* 카드 우상단 45° 컷 */
+  .cut-corner { clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%); }
+
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
+
+/* ── 모션 ── */
+@keyframes rise { from { transform: translateY(24px); } to { transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes draw { from { stroke-dashoffset: var(--len, 400); } to { stroke-dashoffset: 0; } }
+@keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes scroll-line { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+@keyframes scan { 0% { transform: translateY(-10%); opacity: 0; } 15% { opacity: 0.8; } 85% { opacity: 0.8; } 100% { transform: translateY(1100%); opacity: 0; } }
+@keyframes tri { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes toast-in { from { transform: translate(-50%, 16px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+.anim-rise { animation: rise 600ms var(--ease-sumex) both; }
+.anim-draw { stroke-dasharray: var(--len, 400); animation: draw 1200ms var(--ease-sumex) both; }
+.pulse-ring { transform-box: fill-box; transform-origin: center; animation: pulse-ring 2s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

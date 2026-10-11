@@ -1,0 +1,13 @@
+# 수멕스 (SUMEX, 주식회사 수멕스)
+
+> 주식회사 수멕스는 Stryker 수술 영상 장비와 수술 도구를 정형외과(OS), 신경외과(NS), 일반외과(GS) 수술실에 공급하는 의료기기 유통사입니다. 2023년 8월 설립, 서울특별시 송파구 충민로 66에 있습니다.
+
+## 주요 페이지
+- [1788 4K OLED Platform](/products/1788): 4K 형광 수술 영상 시스템 (Overlay · ENV · Contrast 모드)
+- [ARTHRO 관절경](/products/arthro): 1688 AIM 4K, CrossFire 2, CrossFlow, ICONIX 등
+- [LAPARO 복강경](/products/laparo): SPY 형광 영상, PneumoClear, AHTO, SPY Laparoscope 등
+- [INSTRUMENT 수술 도구](/products/instrument): System 9, Signature 2, TPX, Bipolar Forceps 등
+- [인체로 찾기](/explore): 어깨 · 무릎 · 척추 · 뇌 · 복부 · 손 · 발 부위별 제품
+- [제품 자료실](/products/library)
+- [회사소개](/about)
+- [문의하기](/contact)

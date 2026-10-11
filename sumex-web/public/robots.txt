@@ -1,0 +1,21 @@
+# TODO: 정식 도메인으로 교체
+User-agent: *
+Allow: /
+Disallow: /ai-search
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Yeti
+Allow: /
+
+Sitemap: http://localhost:5173/sitemap.xml
