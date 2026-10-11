@@ -79,7 +79,7 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="fixed inset-x-0 bottom-0 top-[72px] z-40 overflow-y-auto bg-bg xl:hidden">
+        <div className="absolute inset-x-0 top-full z-40 h-[calc(100dvh-72px)] overflow-y-auto border-t border-line bg-bg xl:hidden">
           <nav aria-label="모바일 메뉴" className="wrap flex flex-col gap-1 py-8">
             {NAV.map((n, i) => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) => cx("flex items-baseline gap-4 border-b border-line py-4", isActive ? "text-primary" : "text-fg")}>

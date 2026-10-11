@@ -1,5 +1,6 @@
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 @import "tailwindcss";
+@source "./";
 
 /* DESIGN.md "SUMEX True Black Engineering" 토큰 */
 @theme {

@@ -6,7 +6,8 @@
     "dev": "react-router dev",
     "build": "react-router build",
     "preview": "sirv build/client --port 4173 --single __spa-fallback.html",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "build:preview": "vite build --config vite.preview.config.ts"
   },
   "dependencies": {
     "@react-router/node": "7.18.4",
@@ -27,6 +28,7 @@
     "tailwindcss": "4.1.11",
     "typescript": "5.8.3",
     "vite": "6.3.5",
+    "vite-plugin-singlefile": "^2.3.3",
     "vite-tsconfig-paths": "5.1.4"
   }
 }
