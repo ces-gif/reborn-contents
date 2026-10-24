@@ -15,11 +15,10 @@ TITLE = '2026 바이브 코딩 창업경진대회'
 DATE = '2026년 10월 22일'
 GIVER = '고 양 산 업 진 흥 원 장'
 GIVER_NAME = '한 동 균'
-UNKNOWN = '＊＊＊ 팀명 확인 필요 ＊＊＊'
 
 BODY = {
     '대상': ('인공지능을 활용한 창의적인 아이디어와 뛰어난 사업화 역량을 선보였으며,',
-             '심사 결과 참가 팀 중 가장 우수한 성적을 거두었으므로',
+             '심사 결과 가장 우수한 성적을 거두었으므로',
              '이에 그 성과를 높이 기려 이 상장을 수여합니다.'),
     '최우수상': ('해결하고자 하는 문제를 명확히 정의하고 탄탄한 비즈니스 모델을 제시하였으며,',
                  '심사 결과 그 우수성을 인정받았으므로',
@@ -32,17 +31,17 @@ BODY = {
                '이에 그 뜻을 기려 이 상장을 수여합니다.'),
 }
 
-# (번호, 상격, 팀명, 팀원)
+# (번호, 상격, 수상자) — 팀명은 상장에 적지 않는다
 AWARDS = [
-    ('01', '대상',     '스펙연구소', ['유진수', '박준호']),
-    ('02', '최우수상', None,         ['김현수']),
-    ('03', '우수상',   '다시',       ['하정묵']),
-    ('04', '장려상',   'ATED LAB',   ['권오규', '장보성']),
-    ('05', '장려상',   '효도한스푼',  ['김승준']),
-    ('06', '장려상',   '한접시',      ['김효나', '주소민']),
-    ('07', '장려상',   '트렌드나비',  ['곽세인', '강미주']),
-    ('08', '장려상',   'y3k',        ['김성훈', '김채원', '신재훈', '김수빈']),
-    ('09', '장려상',   None,         ['윤지성']),
+    ('01', '대상',     ['유진수', '박준호']),
+    ('02', '최우수상', ['김현수']),
+    ('03', '우수상',   ['하정묵']),
+    ('04', '장려상',   ['권오규', '장보성']),
+    ('05', '장려상',   ['김승준']),
+    ('06', '장려상',   ['김효나', '주소민']),
+    ('07', '장려상',   ['곽세인', '강미주']),
+    ('08', '장려상',   ['김성훈', '김채원', '신재훈', '김수빈']),
+    ('09', '장려상',   ['윤지성']),
 ]
 
 CSS = f'''
@@ -66,7 +65,6 @@ h1{{font-size:22mm;font-weight:700;letter-spacing:9mm;text-indent:9mm;
  text-indent:2.4mm;color:#17365D}}
 .who{{margin-top:8mm;font-size:6mm;line-height:2;letter-spacing:.3mm}}
 .who b{{font-weight:700;letter-spacing:1.4mm}}
-.who .un{{color:#C4372F;font-family:'NS';font-size:5mm;letter-spacing:0}}
 .body{{margin-top:8mm;font-size:5.2mm;line-height:2}}
 .date{{margin-top:auto;padding-top:9mm;font-size:5.8mm;letter-spacing:1mm}}
 .sign{{margin-top:7mm;font-size:8mm;font-weight:700;letter-spacing:1.2mm;
@@ -75,18 +73,9 @@ h1{{font-size:22mm;font-weight:700;letter-spacing:9mm;text-indent:9mm;
 '''
 
 
-def page(no, rank, team, members):
+def page(no, rank, members):
     t1, t2, t3 = BODY[rank]
-    names = '，　'.join(members)
-    if team:
-        rows = (f'<div>팀　　명 ：　<b>{team}</b></div>'
-                f'<div>팀　　원 ：　<b>{names}</b></div>')
-        subject = '위 팀은'
-    else:
-        # 팀명을 아직 못 받았어도 수상자 이름은 반드시 찍는다
-        rows = (f'<div>성　　명 ：　<b>{names}</b></div>'
-                f'<div>팀　　명 ：　<span class="un">{UNKNOWN}</span></div>')
-        subject = '위 사람은'
+    rows = f'<div>성　　명 ：　<b>{"，　".join(members)}</b></div>'
     return f'''<div class="pg"><div class="frame"></div>
  <div class="in">
   <div class="no">제 2026-{no}호</div>
@@ -94,7 +83,7 @@ def page(no, rank, team, members):
   <div class="rank">{rank}</div>
   <div class="who">{rows}</div>
   <div class="body">
-   {subject} 「{TITLE}」에 참가하여<br>
+   위 사람은 「{TITLE}」에 참가하여<br>
    {t1}<br>{t2}<br>{t3}
   </div>
   <div class="date">{DATE}</div>
