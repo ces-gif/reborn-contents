@@ -18,8 +18,8 @@ IMG = {k: f'data:image/png;base64,{b64(LOGO / f"{k}.png")}'
 TITLE_SMALL = '2026 고양시'
 TITLE = '바이브 코딩 창업경진대회'
 CEREMONY = '시 상 식'
-WHEN = '2026. 10. 22.(목)'          # ← 날짜가 다르면 이 한 줄만 고친다
-WHERE = '한국항공대학교'
+WHEN = '2026. 11. 2.(월)'          # ← 날짜가 다르면 이 한 줄만 고친다
+WHERE = '한국항공대학교 대강당'
 GIVER = '고양산업진흥원장'
 
 # (상격, 수상자, 금액표기, 금액설명)
@@ -132,25 +132,26 @@ body{{font-family:'NS',sans-serif;color:#fff;-webkit-print-color-adjust:exact;pr
 .cn.bl{{bottom:40mm;left:50mm;border-right:0;border-top:0}}
 .cn.br{{bottom:40mm;right:50mm;border-left:0;border-top:0}}
 
-.in{{position:relative;z-index:2;height:100%;padding:0 230mm;
- display:grid;grid-template-columns:1fr auto 1fr;align-items:center}}
+.in{{position:relative;z-index:2;height:100%;padding:0 110mm;
+ display:flex;align-items:center;justify-content:space-between}}
 
 /* 왼쪽 — 행사명 */
-.left{{justify-self:start}}
-.eyebrow{{font-size:46mm;color:{GOLD};letter-spacing:9mm;white-space:nowrap}}
+.left{{flex:0 0 auto}}
+.eyebrow{{font-size:58mm;color:{GOLD};letter-spacing:9mm;white-space:nowrap}}
 .eyebrow i{{display:inline-block;width:64mm;height:1.1mm;background:{GOLD};
  vertical-align:middle;margin:0 20mm 0 0}}
-h1{{margin-top:20mm;font-size:150mm;line-height:1.04;font-weight:700;letter-spacing:-2.5mm;
+h1{{margin-top:22mm;font-size:168mm;line-height:1.04;font-weight:700;letter-spacing:-2.5mm;
  white-space:nowrap;text-shadow:0 0 26mm rgba(111,224,255,.22)}}
 h1 em{{font-style:normal;color:{CYAN}}}
-.rule{{margin:24mm 0 18mm;width:360mm;height:1.6mm;
+.rule{{margin:26mm 0 20mm;width:420mm;height:1.6mm;
  background:linear-gradient(90deg,{GOLD},rgba(232,199,122,0))}}
-.sub{{font-size:44mm;color:#DCE8FF;white-space:nowrap}}
+.sub{{font-size:60mm;color:#DCE8FF;white-space:nowrap}}
 .sub b{{color:{GOLD};font-weight:700}}
 .sub span{{color:rgba(232,199,122,.6);margin:0 16mm}}
 
 /* 가운데 — 월계관 안의 시상식 */
-.mid{{position:relative;width:760mm;height:760mm}}
+.mid{{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+ width:760mm;height:760mm}}
 .aura{{position:absolute;left:50%;top:50%;width:300%;height:300%;
  transform:translate(-50%,-50%);
  background:radial-gradient(circle,rgba(232,199,122,.20) 0%,transparent 52%)}}
@@ -168,18 +169,18 @@ h1 em{{font-style:normal;color:{CYAN}}}
  color:rgba(232,199,122,.85);white-space:nowrap}}
 
 /* 오른쪽 — 일시·장소·로고 */
-.right{{justify-self:end;text-align:left}}
-.metabox{{padding-left:28mm;border-left:3mm solid {GOLD}}}
-.metabox .row{{font-size:46mm;line-height:1.75;color:#AFC8EA;white-space:nowrap}}
-.metabox .row b{{color:#fff;font-weight:700;margin-left:20mm}}
-.bar{{margin-top:38mm;display:grid;grid-template-columns:auto auto;align-items:center;
- justify-content:start;column-gap:24mm;row-gap:13mm;background:#fff;border-radius:10mm;
- padding:18mm 26mm}}
-.lbl{{font-size:20mm;font-weight:700;color:#4A5568;background:#EDF1F7;border-radius:5mm;
- padding:5mm 11mm;text-align:center}}
-.logos{{display:flex;align-items:center;gap:26mm}}
+.right{{flex:0 0 auto;text-align:left}}
+.metabox{{padding-left:34mm;border-left:4mm solid {GOLD}}}
+.metabox .row{{font-size:76mm;line-height:1.6;color:#AFC8EA;white-space:nowrap}}
+.metabox .row b{{color:#fff;font-weight:700;margin-left:26mm}}
+.bar{{margin-top:44mm;display:grid;grid-template-columns:auto auto auto auto;
+ align-items:center;column-gap:30mm;background:#fff;border-radius:12mm;padding:22mm 32mm}}
+.bar .lbl+.logos{{margin-right:22mm}}
+.lbl{{font-size:30mm;font-weight:700;color:#4A5568;background:#EDF1F7;border-radius:6mm;
+ padding:7mm 14mm;text-align:center;white-space:nowrap}}
+.logos{{display:flex;align-items:center;gap:32mm}}
 .logos img{{display:block}}
-.l-molab{{height:34mm}} .l-hrdk{{height:29mm}} .l-goyang{{height:39mm}} .l-kdp{{height:32mm}}
+.l-molab{{height:70mm}} .l-hrdk{{height:60mm}} .l-goyang{{height:76mm}} .l-kdp{{height:64mm}}
 </style>
 <div class="wrap">{rays(W, H, 30)}{bokeh(W, H)}
  <div class="edge t"></div><div class="edge b"></div>

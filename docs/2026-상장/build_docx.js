@@ -10,7 +10,7 @@ const F = { ascii: '바탕', hAnsi: '바탕', eastAsia: '바탕', cs: '바탕', 
 const NAVY = '17365D', DIM = '8A94A6';
 
 const TITLE = '2026 바이브 코딩 창업경진대회';
-const DATE = '2026년 10월 22일';
+const DATE = '2026년 11월 2일';
 const GIVER = '고 양 산 업 진 흥 원 장';
 const GIVER_NAME = '한 동 균';
 

@@ -12,7 +12,7 @@ FONT = '/usr/share/fonts/truetype/nanum'
 CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 
 TITLE = '2026 바이브 코딩 창업경진대회'
-DATE = '2026년 10월 22일'
+DATE = '2026년 11월 2일'
 GIVER = '고 양 산 업 진 흥 원 장'
 GIVER_NAME = '한 동 균'
 
