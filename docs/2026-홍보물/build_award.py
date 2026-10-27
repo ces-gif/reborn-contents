@@ -67,6 +67,48 @@ BAR = (f'<span class="lbl">주최</span><span class="logos">'
        f'<img class="l-goyang" src="{IMG["goyang"]}"><img class="l-kdp" src="{IMG["kdp"]}"></span>')
 
 
+# ══════════════════════════════════════════ 배경 장식
+def bokeh(w, h, n=70, seed=7):
+    """금빛 입자. 난수 시드를 고정해 다시 돌려도 같은 그림이 나온다."""
+    import random
+    rnd = random.Random(seed)
+    dots = [f'<circle cx="{rnd.uniform(0, w):.0f}" cy="{rnd.uniform(0, h):.0f}" '
+            f'r="{rnd.uniform(w * .0005, w * .0017):.1f}" '
+            f'opacity="{rnd.uniform(.08, .32):.2f}"/>' for _ in range(n)]
+    return (f'<svg class="bgart" viewBox="0 0 {w} {h}" preserveAspectRatio="none">'
+            f'<g fill="{GOLD}">{"".join(dots)}</g></svg>')
+
+
+def wreath(n=14):
+    """월계관. 오른쪽 가지만 그리고 왼쪽은 좌우 반전해 붙인다 — 반드시 대칭이 된다."""
+    import math
+    cx = cy = 100.0
+    R = 78.0
+    th0, th1 = 96.0, -54.0                      # 아래에서 시작해 위로 열린다
+    leaves = []
+    for i in range(n):
+        th = math.radians(th0 + (th1 - th0) * i / (n - 1))
+        for rr, rot, sc in ((R + 10, -58, 1.0),):
+            lx, ly = cx + rr * math.cos(th), cy + rr * math.sin(th)
+            deg = math.degrees(th) + rot
+            leaves.append(f'<ellipse rx="{9.6 * sc:.1f}" ry="{4.1 * sc:.1f}" '
+                          f'transform="translate({lx:.1f},{ly:.1f}) rotate({deg:.0f})"/>')
+    a0, a1 = math.radians(th0), math.radians(th1)
+    stem = (f'<path d="M{cx + R * math.cos(a0):.1f},{cy + R * math.sin(a0):.1f} '
+            f'A{R},{R} 0 0 0 {cx + R * math.cos(a1):.1f},{cy + R * math.sin(a1):.1f}" '
+            f'fill="none" stroke="{GOLD}" stroke-width="1.6" stroke-linecap="round"/>')
+    branch = f'<g fill="{GOLD}">{"".join(leaves)}</g>{stem}'
+    # 위가 트인 자리에 별 하나
+    pts = []
+    for i in range(10):
+        a = math.radians(-90 + i * 36)
+        r = 13 if i % 2 == 0 else 5.4
+        pts.append(f'{cx + r * math.cos(a):.1f},{20 + r * math.sin(a):.1f}')
+    star = f'<polygon points="{" ".join(pts)}" fill="{GOLD}"/>'
+    return (f'<svg class="wr" viewBox="0 0 200 200">'
+            f'{branch}<g transform="translate(200,0) scale(-1,1)">{branch}</g>{star}</svg>')
+
+
 # ══════════════════════════════════════════ 시상식 현수막 5000 × 900mm
 def banner():
     W, H = 5000, 900
@@ -76,44 +118,91 @@ def banner():
 body{{font-family:'NS',sans-serif;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 .wrap{{width:{W}mm;height:{H}mm;position:relative;overflow:hidden;background:{NAVY_BG}}}
 .bgart{{position:absolute;inset:0;width:100%;height:100%}}
-.glow{{position:absolute;left:46%;top:-55%;width:120%;height:210%;transform:translateX(-50%);
- background:radial-gradient(ellipse at 50% 50%,rgba(232,199,122,.22),transparent 60%)}}
-.edge{{position:absolute;left:0;right:0;height:11mm;background:
- linear-gradient(90deg,{GOLD2},{GOLD},{GOLD2})}}
+
+
+/* 금색 테두리 — 굵은 띠 + 안쪽 실선 + 네 귀퉁이 꺾쇠 */
+.edge{{position:absolute;left:0;right:0;height:10mm;
+ background:linear-gradient(90deg,{GOLD2},{GOLD},#FFF0C8,{GOLD},{GOLD2});z-index:3}}
 .edge.t{{top:0}} .edge.b{{bottom:0}}
-.in{{position:relative;z-index:2;height:100%;padding:0 150mm;
- display:flex;align-items:center;gap:120mm}}
-.left{{flex:0 0 auto}}
-.eyebrow{{font-size:46mm;color:{GOLD};letter-spacing:11mm;margin-bottom:22mm}}
-h1{{font-size:132mm;line-height:1.06;font-weight:700;letter-spacing:-2mm;white-space:nowrap}}
+.hair{{position:absolute;left:0;right:0;height:1.4mm;background:rgba(232,199,122,.55);z-index:3}}
+.hair.t{{top:22mm}} .hair.b{{bottom:22mm}}
+.cn{{position:absolute;width:130mm;height:130mm;border:2.6mm solid rgba(232,199,122,.6);z-index:3}}
+.cn.tl{{top:40mm;left:50mm;border-right:0;border-bottom:0}}
+.cn.tr{{top:40mm;right:50mm;border-left:0;border-bottom:0}}
+.cn.bl{{bottom:40mm;left:50mm;border-right:0;border-top:0}}
+.cn.br{{bottom:40mm;right:50mm;border-left:0;border-top:0}}
+
+.in{{position:relative;z-index:2;height:100%;padding:0 230mm;
+ display:grid;grid-template-columns:1fr auto 1fr;align-items:center}}
+
+/* 왼쪽 — 행사명 */
+.left{{justify-self:start}}
+.eyebrow{{font-size:46mm;color:{GOLD};letter-spacing:9mm;white-space:nowrap}}
+.eyebrow i{{display:inline-block;width:64mm;height:1.1mm;background:{GOLD};
+ vertical-align:middle;margin:0 20mm 0 0}}
+h1{{margin-top:20mm;font-size:150mm;line-height:1.04;font-weight:700;letter-spacing:-2.5mm;
+ white-space:nowrap;text-shadow:0 0 26mm rgba(111,224,255,.22)}}
 h1 em{{font-style:normal;color:{CYAN}}}
-.mid{{flex:1;display:flex;justify-content:center}}
-.cer{{border:4mm solid {GOLD};border-radius:16mm;padding:26mm 60mm;
- font-size:150mm;font-weight:700;letter-spacing:26mm;text-indent:26mm;color:{GOLD};
- line-height:1.05;white-space:nowrap;
- box-shadow:0 0 30mm rgba(232,199,122,.28) inset}}
-.right{{flex:0 0 auto;text-align:right}}
-.meta{{font-size:42mm;line-height:1.9;color:#DCE8FF;white-space:nowrap}}
-.meta b{{color:#fff;font-weight:700}}
-.bar{{margin-top:34mm;display:grid;grid-template-columns:auto auto;align-items:center;
- justify-content:end;column-gap:24mm;row-gap:13mm;background:#fff;border-radius:10mm;
- padding:17mm 24mm}}
+.rule{{margin:24mm 0 18mm;width:360mm;height:1.6mm;
+ background:linear-gradient(90deg,{GOLD},rgba(232,199,122,0))}}
+.sub{{font-size:44mm;color:#DCE8FF;white-space:nowrap}}
+.sub b{{color:{GOLD};font-weight:700}}
+.sub span{{color:rgba(232,199,122,.6);margin:0 16mm}}
+
+/* 가운데 — 월계관 안의 시상식 */
+.mid{{position:relative;width:760mm;height:760mm}}
+.aura{{position:absolute;left:50%;top:50%;width:300%;height:300%;
+ transform:translate(-50%,-50%);
+ background:radial-gradient(circle,rgba(232,199,122,.20) 0%,transparent 52%)}}
+.disc{{position:absolute;left:50%;top:50%;width:66%;height:66%;
+ transform:translate(-50%,-50%);border-radius:50%;
+ background:radial-gradient(circle,rgba(3,7,22,.88) 0%,rgba(3,7,22,.55) 68%,transparent 100%)}}
+.wr{{position:absolute;inset:0;width:100%;height:100%;
+ filter:drop-shadow(0 0 16mm rgba(232,199,122,.40))}}
+.cerwrap{{position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);text-align:center}}
+.cer{{font-size:132mm;font-weight:700;letter-spacing:20mm;text-indent:20mm;
+ line-height:1.1;white-space:nowrap;color:{GOLD};
+ background:linear-gradient(180deg,#FFFBEE 0%,#F6DFA6 40%,{GOLD} 72%,#FFF4CE 100%);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}}
+.cersub{{margin-top:14mm;font-size:23mm;letter-spacing:8mm;text-indent:8mm;
+ color:rgba(232,199,122,.85);white-space:nowrap}}
+
+/* 오른쪽 — 일시·장소·로고 */
+.right{{justify-self:end;text-align:left}}
+.metabox{{padding-left:28mm;border-left:3mm solid {GOLD}}}
+.metabox .row{{font-size:46mm;line-height:1.75;color:#AFC8EA;white-space:nowrap}}
+.metabox .row b{{color:#fff;font-weight:700;margin-left:20mm}}
+.bar{{margin-top:38mm;display:grid;grid-template-columns:auto auto;align-items:center;
+ justify-content:start;column-gap:24mm;row-gap:13mm;background:#fff;border-radius:10mm;
+ padding:18mm 26mm}}
 .lbl{{font-size:20mm;font-weight:700;color:#4A5568;background:#EDF1F7;border-radius:5mm;
  padding:5mm 11mm;text-align:center}}
 .logos{{display:flex;align-items:center;gap:26mm}}
 .logos img{{display:block}}
 .l-molab{{height:34mm}} .l-hrdk{{height:29mm}} .l-goyang{{height:39mm}} .l-kdp{{height:32mm}}
 </style>
-<div class="wrap">{rays(W, H)}<div class="glow"></div>
+<div class="wrap">{rays(W, H, 30)}{bokeh(W, H)}
  <div class="edge t"></div><div class="edge b"></div>
+ <div class="hair t"></div><div class="hair b"></div>
+ <i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i>
  <div class="in">
   <div class="left">
-   <div class="eyebrow">{TITLE_SMALL}</div>
+   <div class="eyebrow"><i></i>{TITLE_SMALL}</div>
    <h1><em>바이브 코딩</em> 창업경진대회</h1>
+   <div class="rule"></div>
+   <div class="sub">대상 · 최우수상 · 우수상 · 장려상<span>|</span>총 시상 규모 <b>2,500,000원</b></div>
   </div>
-  <div class="mid"><div class="cer">{CEREMONY}</div></div>
+  <div class="mid"><div class="aura"></div>{wreath()}<div class="disc"></div>
+   <div class="cerwrap">
+    <div class="cer">{CEREMONY}</div>
+    <div class="cersub">AWARDS CEREMONY</div>
+   </div>
+  </div>
   <div class="right">
-   <div class="meta">일시 &nbsp;<b>{WHEN}</b><br>장소 &nbsp;<b>{WHERE}</b></div>
+   <div class="metabox">
+    <div class="row">일시<b>{WHEN}</b></div>
+    <div class="row">장소<b>{WHERE}</b></div>
+   </div>
    <div class="bar">{BAR}</div>
   </div>
  </div>
