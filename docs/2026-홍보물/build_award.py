@@ -22,6 +22,10 @@ WHEN = '2026. 11. 2.(월)'          # ← 날짜가 다르면 이 한 줄만 고
 WHERE = '한국항공대학교 대강당'
 GIVER = '고양산업진흥원장'
 
+# 상패를 만들 상격. 장려상은 상장만 주고 상패는 만들지 않는다.
+# 되살리려면 여기에 '장려상' 을 넣기만 하면 된다.
+PANEL_RANKS = ('대상', '최우수상', '우수상')
+
 # (상격, 수상자, 금액표기, 금액설명)
 AWARDS = [
     ('대상',     ['유진수', '박준호'],                     '1,000,000', '금 일백만원정'),
@@ -238,7 +242,7 @@ def panel(rank, names, amount, desc):
 
 def panels():
     W, H = 900, 600
-    pages = ''.join(panel(*a) for a in AWARDS)
+    pages = ''.join(panel(*a) for a in AWARDS if a[0] in PANEL_RANKS)
     return f'''<!doctype html><meta charset="utf-8"><style>{FONTCSS}
 @page{{size:{W}mm {H}mm;margin:0}}
 *{{margin:0;padding:0;box-sizing:border-box}}
@@ -302,7 +306,7 @@ def preview(name, page, width):
 def main():
     render('시상식_현수막_5000x900', banner())
     render('상금패널_900x600', panels())
-    print(f'    상금 패널 {len(AWARDS)}매')
+    print(f'    상금 패널 {sum(a[0] in PANEL_RANKS for a in AWARDS)}매')
     preview('시상식_현수막_5000x900', 1, 3000)
     preview('상금패널_900x600', 1, 1400)
 
