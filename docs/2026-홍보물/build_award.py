@@ -214,6 +214,108 @@ h1 em{{font-style:normal;color:{CYAN}}}
 </div>'''
 
 
+# ══════════════════════════════════════════ 대강당 상단 전광판 (8.3 : 1)
+# 현장 사진에서 잰 값 — 화면 1930 x 232px → 8.32 : 1.
+# AV 담당에게 실제 해상도를 받으면 이 두 줄만 고치면 된다.
+STRIP_W, STRIP_H = 1660, 200          # mm. 비율만 맞으면 실제 치수는 상관없다
+
+
+def strip():
+    """가로로 더 긴 전광판용. 5000x900(5.6:1)을 그대로 띄우면 좌우가 남고
+    위아래가 잘린다. 높이를 1rem = 1% 로 잡아 비율만 바꿔 다시 짠다."""
+    W, H = STRIP_W, STRIP_H
+    return f'''<!doctype html><meta charset="utf-8"><style>{FONTCSS}
+@page{{size:{W}mm {H}mm;margin:0}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+html{{font-size:{H / 100}mm}}                 /* 1rem = 화면 높이의 1% */
+body{{font-family:'NS',sans-serif;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.wrap{{width:{W}mm;height:{H}mm;position:relative;overflow:hidden;background:{NAVY_BG}}}
+.bgart{{position:absolute;inset:0;width:100%;height:100%}}
+
+.edge{{position:absolute;left:0;right:0;height:1.2rem;
+ background:linear-gradient(90deg,{GOLD2},{GOLD},#FFF0C8,{GOLD},{GOLD2});z-index:3}}
+.edge.t{{top:0}} .edge.b{{bottom:0}}
+.hair{{position:absolute;left:0;right:0;height:.18rem;background:rgba(232,199,122,.55);z-index:3}}
+.hair.t{{top:2.6rem}} .hair.b{{bottom:2.6rem}}
+.cn{{position:absolute;width:15rem;height:15rem;border:.3rem solid rgba(232,199,122,.6);z-index:3}}
+.cn.tl{{top:5rem;left:1.1rem}} .cn.tr{{top:5rem;right:1.1rem}}
+.cn.bl{{bottom:5rem;left:1.1rem}} .cn.br{{bottom:5rem;right:1.1rem}}
+.cn.tl{{border-right:0;border-bottom:0}} .cn.tr{{border-left:0;border-bottom:0}}
+.cn.bl{{border-right:0;border-top:0}} .cn.br{{border-left:0;border-top:0}}
+
+.in{{position:relative;z-index:2;height:100%;padding:0 16rem;
+ display:flex;align-items:center;justify-content:space-between}}
+.left{{flex:0 0 auto}}
+.eyebrow{{font-size:8rem;color:{GOLD};letter-spacing:1.5rem;white-space:nowrap}}
+.eyebrow i{{display:inline-block;width:9rem;height:.16rem;background:{GOLD};
+ vertical-align:middle;margin-right:3rem}}
+h1{{margin-top:2.6rem;font-size:27rem;line-height:1.04;font-weight:700;letter-spacing:-.4rem;
+ white-space:nowrap;text-shadow:0 0 4rem rgba(111,224,255,.22)}}
+h1 em{{font-style:normal;color:{CYAN}}}
+.rule{{margin:3.4rem 0 2.6rem;width:52rem;height:.24rem;
+ background:linear-gradient(90deg,{GOLD},rgba(232,199,122,0))}}
+.sub{{font-size:8.6rem;color:#DCE8FF;white-space:nowrap}}
+.sub b{{color:{GOLD};font-weight:700}}
+.sub span{{color:rgba(232,199,122,.6);margin:0 2.4rem}}
+
+.mid{{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+ width:80rem;height:80rem}}
+.aura{{position:absolute;left:50%;top:50%;width:300%;height:300%;
+ transform:translate(-50%,-50%);
+ background:radial-gradient(circle,rgba(232,199,122,.20) 0%,transparent 52%)}}
+.disc{{position:absolute;left:50%;top:50%;width:66%;height:66%;
+ transform:translate(-50%,-50%);border-radius:50%;
+ background:radial-gradient(circle,rgba(3,7,22,.88) 0%,rgba(3,7,22,.55) 68%,transparent 100%)}}
+.wr{{position:absolute;inset:0;width:100%;height:100%;
+ filter:drop-shadow(0 0 2.4rem rgba(232,199,122,.40))}}
+.cerwrap{{position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);text-align:center}}
+.cer{{font-size:14rem;font-weight:700;letter-spacing:2.4rem;text-indent:2.4rem;
+ line-height:1.1;white-space:nowrap;color:{GOLD};
+ background:linear-gradient(180deg,#FFFBEE 0%,#F6DFA6 40%,{GOLD} 72%,#FFF4CE 100%);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}}
+.cersub{{margin-top:1.7rem;font-size:2.8rem;letter-spacing:.95rem;text-indent:.95rem;
+ color:rgba(232,199,122,.85);white-space:nowrap}}
+
+.right{{flex:0 0 auto;text-align:left}}
+.metabox{{padding-left:4.2rem;border-left:.5rem solid {GOLD}}}
+.metabox .row{{font-size:11.2rem;line-height:1.6;color:#AFC8EA;white-space:nowrap}}
+.metabox .row b{{color:#fff;font-weight:700;margin-left:3.4rem}}
+.bar{{margin-top:5.4rem;display:grid;grid-template-columns:auto auto auto auto;
+ align-items:center;column-gap:4rem;background:#fff;border-radius:1.6rem;padding:3rem 4.4rem}}
+.bar .lbl+.logos{{margin-right:3rem}}
+.lbl{{font-size:4rem;font-weight:700;color:#4A5568;background:#EDF1F7;border-radius:.8rem;
+ padding:1rem 1.9rem;text-align:center;white-space:nowrap}}
+.logos{{display:flex;align-items:center;gap:4.4rem}}
+.logos img{{display:block}}
+.l-molab{{height:10.4rem}} .l-hrdk{{height:8.8rem}} .l-goyang{{height:11.2rem}} .l-kdp{{height:9.4rem}}
+</style>
+<div class="wrap">{rays(W, H, 30)}{bokeh(W, H, 60)}
+ <div class="edge t"></div><div class="edge b"></div>
+ <div class="hair t"></div><div class="hair b"></div>
+ <i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i>
+ <div class="mid"><div class="aura"></div>{wreath()}<div class="disc"></div>
+  <div class="cerwrap">
+   <div class="cer">{CEREMONY}</div>
+   <div class="cersub">AWARDS CEREMONY</div>
+  </div>
+ </div>
+ <div class="in">
+  <div class="left">
+   <div class="eyebrow"><i></i>{TITLE_SMALL}</div>
+   <h1><em>바이브 코딩</em> 창업경진대회</h1>
+   <div class="rule"></div>
+   <div class="sub">대상 · 최우수상 · 우수상 · 장려상<span>|</span>총 시상 규모 <b>2,500,000원</b></div>
+  </div>
+  <div class="right">
+   <div class="metabox">
+    <div class="row">일시<b>{WHEN}</b></div>
+    <div class="row">장소<b>{WHERE}</b></div>
+   </div>
+   <div class="bar">{BAR}</div>
+  </div>
+ </div>
+</div>'''
+
 # ══════════════════════════════════════════ 16:9 슬라이드 338.67 × 190.5mm
 def slide169():
     """대강당 스크린·PPT 용. 5m 현수막은 가로로 길어 좌우 3단이지만,
@@ -382,10 +484,12 @@ def preview(name, page, width):
 
 def main():
     render('시상식_현수막_5000x900', banner())
+    render('시상식_전광판_8.3x1', strip())
     render('시상식_슬라이드_16x9', slide169())
     render('상금패널_900x600', panels())
     print(f'    상금 패널 {sum(a[0] in PANEL_RANKS for a in AWARDS)}매')
     preview('시상식_현수막_5000x900', 1, 3000)
+    preview('시상식_전광판_8.3x1', 1, 3000)
     preview('시상식_슬라이드_16x9', 1, 1600)
     preview('상금패널_900x600', 1, 1400)
 
