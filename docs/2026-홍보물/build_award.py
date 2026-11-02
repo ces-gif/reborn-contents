@@ -214,6 +214,83 @@ h1 em{{font-style:normal;color:{CYAN}}}
 </div>'''
 
 
+# ══════════════════════════════════════════ 16:9 슬라이드 338.67 × 190.5mm
+def slide169():
+    """대강당 스크린·PPT 용. 5m 현수막은 가로로 길어 좌우 3단이지만,
+    16:9 는 세로 여유가 있어 행사명 → 엠블럼 → 일시·로고로 쌓는다."""
+    W, H = 338.67, 190.5
+    return f'''<!doctype html><meta charset="utf-8"><style>{FONTCSS}
+@page{{size:{W}mm {H}mm;margin:0}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'NS',sans-serif;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.wrap{{width:{W}mm;height:{H}mm;position:relative;overflow:hidden;background:{NAVY_BG}}}
+.bgart{{position:absolute;inset:0;width:100%;height:100%}}
+
+.edge{{position:absolute;left:0;right:0;height:3mm;
+ background:linear-gradient(90deg,{GOLD2},{GOLD},#FFF0C8,{GOLD},{GOLD2});z-index:3}}
+.edge.t{{top:0}} .edge.b{{bottom:0}}
+.hair{{position:absolute;left:0;right:0;height:.5mm;background:rgba(232,199,122,.55);z-index:3}}
+.hair.t{{top:6.5mm}} .hair.b{{bottom:6.5mm}}
+.cn{{position:absolute;width:26mm;height:26mm;border:.8mm solid rgba(232,199,122,.6);z-index:3}}
+.cn.tl{{top:11mm;left:11mm;border-right:0;border-bottom:0}}
+.cn.tr{{top:11mm;right:11mm;border-left:0;border-bottom:0}}
+.cn.bl{{bottom:11mm;left:11mm;border-right:0;border-top:0}}
+.cn.br{{bottom:11mm;right:11mm;border-left:0;border-top:0}}
+
+.in{{position:relative;z-index:2;height:100%;padding:17mm 26mm 15mm;
+ display:flex;flex-direction:column;align-items:center;text-align:center}}
+.eyebrow{{font-size:7mm;color:{GOLD};letter-spacing:3mm;text-indent:3mm;white-space:nowrap}}
+h1{{margin-top:3mm;font-size:17mm;line-height:1.1;font-weight:700;letter-spacing:-.3mm;
+ white-space:nowrap;text-shadow:0 0 4mm rgba(111,224,255,.22)}}
+h1 em{{font-style:normal;color:{CYAN}}}
+
+.mid{{position:relative;width:86mm;height:86mm;margin-top:2mm}}
+.aura{{position:absolute;left:50%;top:50%;width:300%;height:300%;
+ transform:translate(-50%,-50%);
+ background:radial-gradient(circle,rgba(232,199,122,.20) 0%,transparent 52%)}}
+.disc{{position:absolute;left:50%;top:50%;width:66%;height:66%;
+ transform:translate(-50%,-50%);border-radius:50%;
+ background:radial-gradient(circle,rgba(3,7,22,.88) 0%,rgba(3,7,22,.55) 68%,transparent 100%)}}
+.wr{{position:absolute;inset:0;width:100%;height:100%;
+ filter:drop-shadow(0 0 2mm rgba(232,199,122,.40))}}
+.cerwrap{{position:absolute;left:50%;top:53%;transform:translate(-50%,-50%)}}
+.cer{{font-size:15mm;font-weight:700;letter-spacing:2.3mm;text-indent:2.3mm;
+ line-height:1.1;white-space:nowrap;color:{GOLD};
+ background:linear-gradient(180deg,#FFFBEE 0%,#F6DFA6 40%,{GOLD} 72%,#FFF4CE 100%);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}}
+.cersub{{margin-top:1.6mm;font-size:2.7mm;letter-spacing:.9mm;text-indent:.9mm;
+ color:rgba(232,199,122,.85);white-space:nowrap}}
+
+.meta{{margin-top:auto;font-size:7.4mm;color:#AFC8EA;white-space:nowrap}}
+.meta b{{color:#fff;font-weight:700;margin:0 1.5mm 0 2.5mm}}
+.meta i{{font-style:normal;color:rgba(232,199,122,.55);margin:0 4mm}}
+.bar{{margin-top:6mm;display:grid;grid-template-columns:auto auto auto auto;
+ align-items:center;column-gap:5mm;background:#fff;border-radius:2.2mm;padding:3.4mm 5mm}}
+.bar .lbl+.logos{{margin-right:3.6mm}}
+.lbl{{font-size:3.4mm;font-weight:700;color:#4A5568;background:#EDF1F7;border-radius:1mm;
+ padding:1.2mm 2.2mm;text-align:center;white-space:nowrap}}
+.logos{{display:flex;align-items:center;gap:5mm}}
+.logos img{{display:block}}
+.l-molab{{height:8mm}} .l-hrdk{{height:6.8mm}} .l-goyang{{height:8.8mm}} .l-kdp{{height:7.2mm}}
+</style>
+<div class="wrap">{rays(W, H, 30)}{bokeh(W, H, 60)}
+ <div class="edge t"></div><div class="edge b"></div>
+ <div class="hair t"></div><div class="hair b"></div>
+ <i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i>
+ <div class="in">
+  <div class="eyebrow">{TITLE_SMALL}</div>
+  <h1><em>바이브 코딩</em> 창업경진대회</h1>
+  <div class="mid"><div class="aura"></div>{wreath()}<div class="disc"></div>
+   <div class="cerwrap">
+    <div class="cer">{CEREMONY}</div>
+    <div class="cersub">AWARDS CEREMONY</div>
+   </div>
+  </div>
+  <div class="meta">일시<b>{WHEN}</b><i>|</i>장소<b>{WHERE}</b></div>
+  <div class="bar">{BAR}</div>
+ </div>
+</div>'''
+
 # ══════════════════════════════════════════ 대형 상금 패널 900 × 600mm
 def panel(rank, names, amount, desc):
     W, H = 900, 600
@@ -305,9 +382,11 @@ def preview(name, page, width):
 
 def main():
     render('시상식_현수막_5000x900', banner())
+    render('시상식_슬라이드_16x9', slide169())
     render('상금패널_900x600', panels())
     print(f'    상금 패널 {sum(a[0] in PANEL_RANKS for a in AWARDS)}매')
     preview('시상식_현수막_5000x900', 1, 3000)
+    preview('시상식_슬라이드_16x9', 1, 1600)
     preview('상금패널_900x600', 1, 1400)
 
 
