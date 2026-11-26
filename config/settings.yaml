@@ -23,7 +23,7 @@ drive:
   publish_parent_id: ""
   # 리본마켓 로고 PNG 파일 ID (드라이브: 입고상품/리본마켓로고).
   # 카드뉴스마다 이 로고를 넣는다. 저장소에 assets/reborn_logo.png 를 두면 그쪽이 우선한다.
-  logo_file_id: "1WWB5_20er3Sjn49svz-ghvcNKRbC90ba"
+  logo_file_id: "1ctI09CzGjeSElwL8j1RcUVQ6NAMs0aEM"
 
 schedule:
   timezone: "Asia/Seoul"
@@ -114,7 +114,9 @@ stores:
           kind: "new"
           eyebrow: "제조사 직거래 새상품"
       publish_parent_id: "12Fm_4Srlwcjw-d58F7qsOh9OdqxmB1D7"
-      logo_file_id: "1WWB5_20er3Sjn49svz-ghvcNKRbC90ba"
+      # 2026-11-25 드라이브 원본 로고(1WWB5...)가 삭제돼 실행이 실패했다. 저장소에 동봉한 로고를 먼저 쓴다.
+      logo_asset: "reborn_logo.png"
+      logo_file_id: "1ctI09CzGjeSElwL8j1RcUVQ6NAMs0aEM"
       logo_wordmark: false   # 진짜 로고가 있는 매장은 글자로 대체하지 않는다
     store:
       id: "reborn-pt"
